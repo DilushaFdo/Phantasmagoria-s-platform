@@ -1,0 +1,32 @@
+const { DataTypes } = require("sequelize");
+const sequelize = require("../db");
+
+const Profile = sequelize.define("Profile", {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true,
+    },
+    biography: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+    },
+    linkedin_url: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    profile_image_path: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    monthly_win_count: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+    },
+    attended_university_event: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+    },
+});
+
+module.exports = Profile;
