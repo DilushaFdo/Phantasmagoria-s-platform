@@ -28,7 +28,12 @@ app.use("/api/", apiLimiter);
 
 // Routes
 const authRoutes = require("./routes/authRoutes");
+const profileRoutes = require("./routes/profileRoutes");
+const bidRoutes = require("./routes/bidRoutes");
+
 app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/bids", bidRoutes);
 
 // Swagger configuration
 const swaggerOptions = {
@@ -42,6 +47,20 @@ const swaggerOptions = {
         servers: [
             {
                 url: `http://localhost:${process.env.PORT || 3000}`,
+            },
+        ],
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: "http",
+                    scheme: "bearer",
+                    bearerFormat: "JWT",
+                },
+            },
+        },
+        security: [
+            {
+                bearerAuth: [],
             },
         ],
     },
