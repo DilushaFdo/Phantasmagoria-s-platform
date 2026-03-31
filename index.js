@@ -26,6 +26,9 @@ const apiLimiter = rateLimit({
 });
 app.use("/api/", apiLimiter);
 
+// Routes
+const authRoutes = require("./routes/authRoutes");
+app.use("/api/auth", authRoutes);
 
 // Swagger configuration
 const swaggerOptions = {
