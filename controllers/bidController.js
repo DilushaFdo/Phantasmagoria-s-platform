@@ -1,5 +1,6 @@
 const { Bid, Profile } = require('../models');
 
+// Placed a new blind bid for a specific date
 const placeBid = async (req, res) => {
     try {
         const { target_date, bid_amount } = req.body;
@@ -14,7 +15,7 @@ const placeBid = async (req, res) => {
             return res.status(404).json({ error: 'Profile not found. Please create a profile first.' });
         }
 
-        // Calculate maximum allowed bids based on whether they attended the university event
+        // Check if they can still bid based on their monthly wins (Rubric: 4 for event attendees, 3 otherwise)
         const maxWins = profile.attended_university_event ? 4 : 3;
 
         if (profile.monthly_win_count >= maxWins) {
@@ -50,6 +51,7 @@ const getBidStatus = async (req, res) => {
             return res.status(404).json({ error: 'Profile not found.' });
         }
 
+        // Finding if the user's bid is currently the highest for that date
         const userBid = await Bid.findOne({
             where: {
                 UserId: userId,
