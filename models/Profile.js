@@ -27,6 +27,10 @@ const Profile = sequelize.define("Profile", {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
     },
+    is_featured_today: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+    },
 });
 
 module.exports = Profile;

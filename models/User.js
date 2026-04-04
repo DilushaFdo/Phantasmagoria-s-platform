@@ -24,6 +24,10 @@ const User = sequelize.define("User", {
         type: DataTypes.STRING,
         allowNull: true,
     },
+    verification_token_expiry: {
+        type: DataTypes.DATE,
+        allowNull: true,
+    },
     reset_token: {
         type: DataTypes.STRING,
         allowNull: true,
