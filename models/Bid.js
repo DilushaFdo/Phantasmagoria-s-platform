@@ -18,6 +18,12 @@ const Bid = sequelize.define("Bid", {
         type: DataTypes.STRING,
         defaultValue: "pending",
     },
+}, {
+    indexes: [
+        {
+            fields: ['target_date']
+        }
+    ]
 });
 
 module.exports = Bid;

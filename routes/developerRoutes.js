@@ -8,6 +8,7 @@ const {
     getDashboardSummary
 } = require('../controllers/developerController');
 
+
 /**
  * @swagger
  * /api/developer/generate-key:
@@ -218,5 +219,6 @@ router.get('/usage-stats', authMiddleware, getUsageStats);
  *                             example: 89
  */
 router.get('/dashboard', authMiddleware, getDashboardSummary);
+
 
 module.exports = router;

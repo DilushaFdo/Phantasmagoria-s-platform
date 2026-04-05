@@ -1,36 +1,17 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { User, LoginLog, Session } = require("../models");
+const { User, LoginLog, Session, CsrfToken } = require("../models");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("../lib/emailService");
+const { createTargetedCsrfToken } = require("../lib/csrfMiddleware");
 const { Op } = require("sequelize");
 
-// Function to check if the password is strong enough (12+ chars, mixed case, numbers, special characters)
-const isPasswordStrong = (password) => {
-    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/;
-    return strongPasswordRegex.test(password);
-};
-
-// Registration controller: hashes password and sends verification email
+// Register a new user, hash their password, and send a verification email
 const register = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Validate the Westminster university domain (Mandatory requirement)
-        if (!email || !email.endsWith("@my.westminster.ac.uk")) {
-            return res.status(400).json({
-                message: "Only @my.westminster.ac.uk email addresses are allowed.",
-            });
-        }
-
-        // Check if the password meets our security rules
-        if (!password || !isPasswordStrong(password)) {
-            return res.status(400).json({
-                message: "Password must be at least 12 characters long and include uppercase, lowercase, a number, and a special character.",
-            });
-        }
-
-        // 3. Check for duplicate email
+        // Check for duplicate email (Business logic remains, format validation moved to middleware)
         const existingUser = await User.findOne({ where: { email } });
         if (existingUser) {
             return res.status(400).json({
@@ -38,13 +19,13 @@ const register = async (req, res) => {
             });
         }
 
-        // Hash the password using Bcrypt as required
+        // Hash the password before saving for security
         const password_hash = await bcrypt.hash(password, 10);
 
-        // 4. Generate a secure 64-character verification token
+        // Create a random token for the verification link
         const verification_token = crypto.randomBytes(32).toString("hex");
 
-        // 5. Create user in database (Unverified by default, token expires in 24 hours)
+        // Add the user to the database with an expiry on the token
         const newUser = await User.create({
             email,
             password_hash,
@@ -53,7 +34,7 @@ const register = async (req, res) => {
             is_verified: false
         });
 
-        // 6. Send Real Verification Email
+        // Send the actual verification email
         await sendVerificationEmail(email, verification_token);
 
         return res.status(201).json({
@@ -66,7 +47,7 @@ const register = async (req, res) => {
     }
 };
 
-// Verifies the user's email using the token sent in the link
+// Verify the user's email using the token from the email link
 const verifyEmail = async (req, res) => {
     try {
         const { token } = req.query;
@@ -75,7 +56,7 @@ const verifyEmail = async (req, res) => {
             return res.status(400).json({ message: "Verification token is required." });
         }
 
-        // Find user by verification token
+        // Find the user with this token
         const user = await User.findOne({ where: { verification_token: token } });
         if (!user) {
             return res.status(400).json({ message: "Invalid or expired verification token." });
@@ -99,22 +80,31 @@ const verifyEmail = async (req, res) => {
     }
 };
 
-// Login controller: checks credentials and gives a JWT cookie if verified
+// Handle login, check credentials, and set the JWT cookie
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // 1. Find user by email
+        // Look up the user by email
         const user = await User.findOne({ where: { email } });
         if (!user) {
             return res.status(401).json({ message: "Invalid email or password." });
         }
 
-        // 2. Just-in-time cleanup of already expired sessions for this user
+        // Clean up any old sessions or CSRF tokens for this user/IP
         await Session.destroy({
             where: {
                 UserId: user.id,
                 expires_at: { [Op.lt]: new Date() }
+            }
+        });
+
+        await CsrfToken.destroy({
+            where: {
+                [Op.or]: [
+                    { UserId: user.id },
+                    { ip_address: req.ip || req.connection.remoteAddress }
+                ]
             }
         });
 
@@ -143,7 +133,7 @@ const login = async (req, res) => {
             user_agent: req.headers["user-agent"] || "Unknown",
         });
 
-        // Store the session in the database (server-side session management)
+        // Create a new session in the database
         await Session.create({
             token,
             UserId: user.id,
@@ -152,17 +142,21 @@ const login = async (req, res) => {
             user_agent: req.headers["user-agent"] || "Unknown",
         });
 
+        // Refresh the CSRF token for the new session
+        const newCsrfToken = await createTargetedCsrfToken(req);
+
         // Set secure httpOnly cookie (Session management)
         res.cookie("jwt", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production", // Secure only in production
-            sameSite: "strict", // MITIGATES CSRF
+            sameSite: "strict", // Helps prevent CSRF attacks
             maxAge: 60 * 60 * 1000, // 1 hour
         });
 
         return res.status(200).json({
             message: "Login successful.",
-            user: { id: user.id, email: user.email }
+            user: { id: user.id, email: user.email },
+            csrfToken: newCsrfToken
         });
     } catch (error) {
         console.error("Login error:", error);
@@ -170,7 +164,7 @@ const login = async (req, res) => {
     }
 };
 
-// Forgot password: sends a reset link to the email if it exists
+// Handle forgot password requests by sending a reset link
 const forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
@@ -181,7 +175,7 @@ const forgotPassword = async (req, res) => {
             return res.status(200).json({ message: "If an account exists with that email, a reset link has been sent." });
         }
 
-        // Generate secure reset token and 1-hour expiry
+        // Generate a secure reset token that lasts for 1 hour
         const reset_token = crypto.randomBytes(32).toString("hex");
         const reset_token_expiry = Date.now() + 3600000; // 1 hour
 
@@ -199,15 +193,12 @@ const forgotPassword = async (req, res) => {
     }
 };
 
-// Reset password: uses the token from the email to set a new password
+// Reset the password using the token from the email
 const resetPassword = async (req, res) => {
     try {
-        const { token } = req.query;
-        const { newPassword } = req.body;
+        const { token, newPassword } = req.body;
 
-        if (!token || !newPassword) {
-            return res.status(400).json({ message: "Token and new password are required." });
-        }
+        // Note: Field presence and password strength are now handled by resetPasswordValidation middleware.
 
         // Find user by token and ensure it hasn't expired
         const user = await User.findOne({
@@ -219,13 +210,6 @@ const resetPassword = async (req, res) => {
 
         if (!user) {
             return res.status(400).json({ message: "Invalid or expired reset token." });
-        }
-
-        // Make sure the new password is also strong
-        if (!newPassword || !isPasswordStrong(newPassword)) {
-            return res.status(400).json({
-                message: "New password must be at least 12 characters long and include uppercase, lowercase, a number, and a special character.",
-            });
         }
 
         // Update password and clear reset fields
@@ -244,7 +228,7 @@ const resetPassword = async (req, res) => {
     }
 };
 
-// Logout: clears the cookie and removes the session from the DB
+// Log the user out, clear cookies, and delete the session
 const logout = async (req, res) => {
     try {
         const token = req.cookies.jwt;
@@ -258,10 +242,28 @@ const logout = async (req, res) => {
         // Delete this specific session from the database
         const destroyed = await Session.destroy({ where: { token } });
 
+        // Also clear any CSRF tokens tied to this user/IP to prevent session fixation or leftovers
+        await CsrfToken.destroy({
+            where: {
+                [Op.or]: [
+                    { ip_address: req.ip || req.connection.remoteAddress }
+                ]
+            }
+        });
+
+        // Rotate CSRF Token on logout for next person or session
+        const newCsrfToken = await createTargetedCsrfToken(req);
+
         if (destroyed) {
-            return res.status(200).json({ message: "Logged out successfully. Session has been terminated." });
+            return res.status(200).json({ 
+                message: "Logged out successfully. Session has been terminated.",
+                csrfToken: newCsrfToken
+            });
         } else {
-            return res.status(401).json({ message: "Unauthorized: Session already terminated or invalid." });
+            return res.status(200).json({ 
+                message: "Logged out successfully (session was already invalid).",
+                csrfToken: newCsrfToken
+            });
         }
     } catch (error) {
         console.error("Logout error:", error);

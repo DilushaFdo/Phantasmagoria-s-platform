@@ -4,7 +4,7 @@ const sequelize = require("../db");
 
 const ALLOWED_SCOPES = ["public:read", "stats:read"];
 
-// Generate a new secure API key with optional scoping
+// Create a new API key for a developer
 const generateKey = async (req, res) => {
     try {
         const { scopes } = req.body; // Expecting an array of strings
@@ -21,19 +21,25 @@ const generateKey = async (req, res) => {
             finalScopes = scopes.join(",");
         }
 
-        const keyString = crypto.randomBytes(32).toString("hex");
+        const rawKey = crypto.randomBytes(32).toString("hex");
 
-        // Create the new API key in the database with the requested scopes
+        // Use SHA-256 to hash the key so we don't store the raw one in the DB
+        const hashedKey = crypto.createHash("sha256").update(rawKey).digest("hex");
+
+        // Create the new API key in the database with the hashed version
         const newKey = await ApiKey.create({
-            key_string: keyString,
-            UserId: req.user.id,
+            key_string: hashedKey,
+            UserId: req.user,
             status: "active",
             scopes: finalScopes
         });
 
         res.status(201).json({
-            message: "API key generated successfully",
-            key: newKey,
+            message: "API key generated successfully. IMPORTANT: This is the ONLY time you will see this key. Store it securely.",
+            id: newKey.id,
+            raw_key: rawKey,
+            scopes: newKey.scopes,
+            status: newKey.status
         });
     } catch (error) {
         console.error("Error generating API key:", error);
@@ -41,7 +47,7 @@ const generateKey = async (req, res) => {
     }
 };
 
-// Revoke an API key by its database ID
+// Revoke an API key so it can't be used anymore
 const revokeKey = async (req, res) => {
     try {
         const { keyId } = req.params;
@@ -49,7 +55,7 @@ const revokeKey = async (req, res) => {
         const key = await ApiKey.findOne({
             where: {
                 id: keyId,
-                UserId: req.user.id,
+                UserId: req.user,
             },
         });
 
@@ -67,12 +73,12 @@ const revokeKey = async (req, res) => {
     }
 };
 
-// Fetch usage statistics for the developer's keys
+// Get stats on how the developer's keys are being used
 const getUsageStats = async (req, res) => {
     try {
         // Find all keys belonging to the user
         const keys = await ApiKey.findAll({
-            where: { UserId: req.user.id }
+            where: { UserId: req.user }
         });
 
         const keyIds = keys.map(k => k.id);
@@ -97,12 +103,12 @@ const getUsageStats = async (req, res) => {
     }
 };
 
-// Gets a summary for the developer dashboard, including login counts and API usage info
+// Get all the stats for the developer dashboard summary
 const getDashboardSummary = async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user;
 
-        // 1. Login statistics
+        // Get login stats
         const totalLogins = await LoginLog.count({ where: { UserId: userId } });
         const recentLogins = await LoginLog.findAll({
             where: { UserId: userId },
@@ -110,20 +116,20 @@ const getDashboardSummary = async (req, res) => {
             limit: 10,
         });
 
-        // 2. API key overview
+        // Get API key overview
         const keys = await ApiKey.findAll({ where: { UserId: userId } });
         const activeKeys = keys.filter(k => k.status === "active").length;
         const revokedKeys = keys.filter(k => k.status === "revoked").length;
         const keyIds = keys.map(k => k.id);
 
-        // 3. Endpoint usage breakdown
+        // Breakdown which endpoints were used
         let endpointBreakdown = [];
         let totalApiHits = 0;
 
         if (keyIds.length > 0) {
             totalApiHits = await ApiUsageLog.count({ where: { ApiKeyId: keyIds } });
 
-            // Counting which endpoints are accessed the most
+            // Count hits for each endpoint
             endpointBreakdown = await ApiUsageLog.findAll({
                 attributes: [
                     "endpoint_accessed",
@@ -162,5 +168,5 @@ module.exports = {
     generateKey,
     revokeKey,
     getUsageStats,
-    getDashboardSummary,
+    getDashboardSummary
 };

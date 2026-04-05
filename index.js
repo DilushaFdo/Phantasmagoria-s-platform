@@ -8,8 +8,8 @@ const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const swaggerUi = require("swagger-ui-express");
 const swaggerJsdoc = require("swagger-jsdoc");
+// Connecting to databases and setting up middleware
 const dbConnection = require("./db");
-// const { User, Profile } = require("./models"); // Removed unused imports
 const { generateCsrfToken, validateCsrfToken } = require("./lib/csrfMiddleware");
 
 const app = express();
@@ -25,6 +25,7 @@ app.use(cors({
     credentials: true,
 }));
 
+// Rate limiting so people don't spam the API
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
@@ -32,20 +33,20 @@ const apiLimiter = rateLimit({
 });
 app.use("/api/", apiLimiter);
 
-// Routes
+// API Routes
 const authRoutes = require("./routes/authRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const bidRoutes = require("./routes/bidRoutes");
 const developerRoutes = require("./routes/developerRoutes");
 const publicApiRoutes = require("./routes/publicApiRoutes");
 
-// Scheduled Tasks
+// Running scheduled tasks (like picking the winner)
 require("./lib/midnightTask");
 
-// CSRF token endpoint (must be before CSRF validation middleware)
+// CSRF token endpoint for the frontend to call first
 app.get("/api/auth/csrf-token", generateCsrfToken);
 
-// Apply CSRF protection to all state-changing API requests
+// Apply CSRF protection for security on all state-changing requests
 app.use("/api/", validateCsrfToken);
 
 app.use("/api/auth", authRoutes);
@@ -54,7 +55,7 @@ app.use("/api/bids", bidRoutes);
 app.use("/api/developer", developerRoutes);
 app.use("/api/public", publicApiRoutes);
 
-// Swagger configuration
+// Setting up Swagger for documentation
 const swaggerOptions = {
     definition: {
         openapi: "3.0.0",
@@ -103,7 +104,8 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 
 
 
-dbConnection.sync({ alter: true }).then(() => {
+// Finally, sync with the DB and start the server!
+dbConnection.sync().then(() => {
     app.listen(process.env.PORT, () => {
         console.log(`Server is running on port ${process.env.PORT}`);
     });

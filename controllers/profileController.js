@@ -1,38 +1,13 @@
 const { Profile, Degree, Certification, Licence, ProfessionalCourse, EmploymentHistory } = require('../models');
 
-// Validates whether the given string is a valid LinkedIn URL
-const isValidLinkedInUrl = (url) => {
-    try {
-        const parsedUrl = new URL(url);
-        return parsedUrl.hostname === 'linkedin.com' || parsedUrl.hostname === 'www.linkedin.com';
-    } catch (error) {
-        return false;
-    }
-};
+// Profile controller handles all the student profile data
 
-// Generic URL validator for degrees, certifications, etc.
-const isValidUrl = (urlString) => {
-    try {
-        const url = new URL(urlString);
-        return url.protocol === "http:" || url.protocol === "https:";
-    } catch (e) {
-        return false;
-    }
-};
-
-// Updates the basic profile info like bio, image, and LinkedIn URL
+// Change bio, LinkedIn, and profile picture
 const updateBaseProfile = async (req, res) => {
     try {
         const userId = req.user;
         const { biography, linkedin_url, profile_image_path } = req.body;
 
-        if (linkedin_url && !isValidLinkedInUrl(linkedin_url)) {
-            return res.status(400).json({ error: 'Invalid LinkedIn URL format. It must be a valid linkedin.com URL.' });
-        }
-
-        if (profile_image_path && !isValidUrl(profile_image_path)) {
-            return res.status(400).json({ error: 'Invalid Image URL format.' });
-        }
 
         let [profile, created] = await Profile.findOrCreate({
             where: { UserId: userId },
@@ -53,7 +28,7 @@ const updateBaseProfile = async (req, res) => {
     }
 };
 
-// Helper function to check if the current user actually owns the record they are trying to edit
+// Check if the user owns the record they want to change
 const verifyOwnership = async (Model, recordId, userId) => {
     const record = await Model.findByPk(recordId, {
         include: [{ model: Profile }]
@@ -64,13 +39,11 @@ const verifyOwnership = async (Model, recordId, userId) => {
     return record;
 };
 
-// CRUD operations for Degrees
+// Degrees
 const addDegree = async (req, res) => {
     try {
         const userId = req.user;
         const { title, url, completion_date } = req.body;
-
-        if (url && !isValidUrl(url)) return res.status(400).json({ error: 'Invalid URL format.' });
 
         let profile = await Profile.findOne({ where: { UserId: userId } });
         if (!profile) profile = await Profile.create({ UserId: userId });
@@ -89,8 +62,6 @@ const updateDegree = async (req, res) => {
         const { title, url, completion_date } = req.body;
         const record = await verifyOwnership(Degree, id, req.user);
         if (!record) return res.status(404).json({ error: 'Degree not found or unauthorized.' });
-
-        if (url && !isValidUrl(url)) return res.status(400).json({ error: 'Invalid URL format.' });
 
         if (title !== undefined) record.title = title;
         if (url !== undefined) record.url = url;
@@ -115,12 +86,11 @@ const deleteDegree = async (req, res) => {
     }
 };
 
-// CRUD operations for Certifications
+// Certifications
 const addCertification = async (req, res) => {
     try {
         const userId = req.user;
         const { title, url, completion_date } = req.body;
-        if (url && !isValidUrl(url)) return res.status(400).json({ error: 'Invalid URL format.' });
 
         let profile = await Profile.findOne({ where: { UserId: userId } });
         if (!profile) profile = await Profile.create({ UserId: userId });
@@ -139,7 +109,6 @@ const updateCertification = async (req, res) => {
         const { title, url, completion_date } = req.body;
         const record = await verifyOwnership(Certification, id, req.user);
         if (!record) return res.status(404).json({ error: 'Certification not found or unauthorized.' });
-        if (url && !isValidUrl(url)) return res.status(400).json({ error: 'Invalid URL format.' });
 
         if (title !== undefined) record.title = title;
         if (url !== undefined) record.url = url;
@@ -159,12 +128,11 @@ const deleteCertification = async (req, res) => {
     } catch (error) { return res.status(500).json({ error: 'Internal server error' }); }
 };
 
-// CRUD operations for Licences
+// Licences
 const addLicence = async (req, res) => {
     try {
         const userId = req.user;
         const { title, url, completion_date } = req.body;
-        if (url && !isValidUrl(url)) return res.status(400).json({ error: 'Invalid URL format.' });
 
         let profile = await Profile.findOne({ where: { UserId: userId } });
         if (!profile) profile = await Profile.create({ UserId: userId });
@@ -183,7 +151,6 @@ const updateLicence = async (req, res) => {
         const { title, url, completion_date } = req.body;
         const record = await verifyOwnership(Licence, id, req.user);
         if (!record) return res.status(404).json({ error: 'Licence not found or unauthorized.' });
-        if (url && !isValidUrl(url)) return res.status(400).json({ error: 'Invalid URL format.' });
 
         if (title !== undefined) record.title = title;
         if (url !== undefined) record.url = url;
@@ -203,12 +170,11 @@ const deleteLicence = async (req, res) => {
     } catch (error) { return res.status(500).json({ error: 'Internal server error' }); }
 };
 
-// CRUD operations for Professional Courses
+// Professional Courses
 const addProfessionalCourse = async (req, res) => {
     try {
         const userId = req.user;
         const { title, url, completion_date } = req.body;
-        if (url && !isValidUrl(url)) return res.status(400).json({ error: 'Invalid URL format.' });
 
         let profile = await Profile.findOne({ where: { UserId: userId } });
         if (!profile) profile = await Profile.create({ UserId: userId });
@@ -227,7 +193,6 @@ const updateProfessionalCourse = async (req, res) => {
         const { title, url, completion_date } = req.body;
         const record = await verifyOwnership(ProfessionalCourse, id, req.user);
         if (!record) return res.status(404).json({ error: 'Course not found or unauthorized.' });
-        if (url && !isValidUrl(url)) return res.status(400).json({ error: 'Invalid URL format.' });
 
         if (title !== undefined) record.title = title;
         if (url !== undefined) record.url = url;
@@ -247,7 +212,7 @@ const deleteProfessionalCourse = async (req, res) => {
     } catch (error) { return res.status(500).json({ error: 'Internal server error' }); }
 };
 
-// CRUD operations for Employment History
+// Employment History
 const addEmploymentHistory = async (req, res) => {
     try {
         const userId = req.user;
@@ -291,7 +256,62 @@ const deleteEmploymentHistory = async (req, res) => {
     } catch (error) { return res.status(500).json({ error: 'Internal server error' }); }
 };
 
-// Gets the full profile for the current user, including all their degrees and certificates
+// Get the path to the profile image
+const getProfileImage = async (req, res) => {
+    try {
+        const userId = req.user;
+        const profile = await Profile.findOne({ where: { UserId: userId } });
+        if (!profile || !profile.profile_image_path) {
+            return res.status(404).json({ error: 'Profile image not found' });
+        }
+        return res.status(200).json({ profile_image_path: profile.profile_image_path });
+    } catch (error) {
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Update the profile image path
+const updateProfileImage = async (req, res) => {
+    try {
+        const userId = req.user;
+        const { profile_image_path } = req.body;
+
+        if (!profile_image_path) {
+            return res.status(400).json({ error: 'profile_image_path is required' });
+        }
+
+        // Just basic validation, accepting any string as requested
+        let profile = await Profile.findOne({ where: { UserId: userId } });
+        if (!profile) {
+            profile = await Profile.create({ UserId: userId, profile_image_path });
+        } else {
+            profile.profile_image_path = profile_image_path;
+            await profile.save();
+        }
+
+        return res.status(200).json({ message: 'Profile image updated successfully', profile_image_path: profile.profile_image_path });
+    } catch (error) {
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Clear the profile image
+const deleteProfileImage = async (req, res) => {
+    try {
+        const userId = req.user;
+        const profile = await Profile.findOne({ where: { UserId: userId } });
+        if (!profile) return res.status(404).json({ error: 'Profile not found' });
+
+        profile.profile_image_path = null;
+        await profile.save();
+
+        return res.status(200).json({ message: 'Profile image deleted successfully' });
+    } catch (error) {
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Get the whole profile with everything included
 const getProfile = async (req, res) => {
     try {
         const userId = req.user;
@@ -306,7 +326,16 @@ const getProfile = async (req, res) => {
             ]
         });
         if (!profile) return res.status(404).json({ error: 'Profile not found' });
-        return res.status(200).json(profile);
+
+        // Calculate how many bids are left for the month
+        const maxWins = profile.attended_university_event ? 4 : 3;
+        const remainingSlots = Math.max(0, maxWins - profile.monthly_win_count);
+
+        return res.status(200).json({
+            ...profile.get({ plain: true }),
+            max_monthly_wins: maxWins,
+            remaining_monthly_slots: remainingSlots
+        });
     } catch (error) {
         console.error("Error retrieving profile:", error);
         return res.status(500).json({ error: 'Internal server error' });
@@ -320,5 +349,6 @@ module.exports = {
     addLicence, updateLicence, deleteLicence,
     addProfessionalCourse, updateProfessionalCourse, deleteProfessionalCourse,
     addEmploymentHistory, updateEmploymentHistory, deleteEmploymentHistory,
-    getProfile
+    getProfile,
+    getProfileImage, updateProfileImage, deleteProfileImage
 };

@@ -8,8 +8,10 @@ const {
     addLicence, updateLicence, deleteLicence,
     addProfessionalCourse, updateProfessionalCourse, deleteProfessionalCourse,
     addEmploymentHistory, updateEmploymentHistory, deleteEmploymentHistory,
-    getProfile
+    getProfile,
+    getProfileImage, updateProfileImage, deleteProfileImage
 } = require('../controllers/profileController');
+const { profileBaseValidation, degreeValidation } = require('../lib/validation');
 
 /**
  * @swagger
@@ -23,7 +25,7 @@ const {
  *         csrfToken: []
  *     responses:
  *       200:
- *         description: Profile retrieved successfully
+ *         description: Profile retrieved successfully (includes max_monthly_wins and remaining_monthly_slots)
  */
 router.get('/', authMiddleware, getProfile);
 
@@ -57,7 +59,7 @@ router.get('/', authMiddleware, getProfile);
  *       400:
  *         description: Invalid URL format
  */
-router.put('/', authMiddleware, updateBaseProfile);
+router.put('/', authMiddleware, profileBaseValidation, updateBaseProfile);
 
 /**
  * @swagger
@@ -83,7 +85,7 @@ router.put('/', authMiddleware, updateBaseProfile);
  *       201:
  *         description: Degree added
  */
-router.post('/degree', authMiddleware, addDegree);
+router.post('/degree', authMiddleware, degreeValidation, addDegree);
 
 /**
  * @swagger
@@ -127,7 +129,7 @@ router.post('/degree', authMiddleware, addDegree);
  *       200: { description: Deleted }
  *       404: { description: Not found }
  */
-router.put('/degree/:id', authMiddleware, updateDegree);
+router.put('/degree/:id', authMiddleware, degreeValidation, updateDegree);
 router.delete('/degree/:id', authMiddleware, deleteDegree);
 
 /**
@@ -273,5 +275,40 @@ router.post('/employment', authMiddleware, addEmploymentHistory);
  */
 router.put('/employment/:id', authMiddleware, updateEmploymentHistory);
 router.delete('/employment/:id', authMiddleware, deleteEmploymentHistory);
+
+/**
+ * @swagger
+ * /api/profile/image:
+ *   get:
+ *     summary: Get the current profile image path
+ *     tags: [Profile]
+ *     security: [ { bearerAuth: [], csrfToken: [] } ]
+ *     responses:
+ *       200:
+ *         description: Image path retrieved
+ *   put:
+ *     summary: Update the profile image path
+ *     tags: [Profile]
+ *     security: [ { bearerAuth: [], csrfToken: [] } ]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               profile_image_path: { type: string }
+ *     responses:
+ *       200: { description: Image path updated }
+ *   delete:
+ *     summary: Remove the profile image path
+ *     tags: [Profile]
+ *     security: [ { bearerAuth: [], csrfToken: [] } ]
+ *     responses:
+ *       200: { description: Image path deleted }
+ */
+router.get('/image', authMiddleware, getProfileImage);
+router.put('/image', authMiddleware, updateProfileImage);
+router.delete('/image', authMiddleware, deleteProfileImage);
 
 module.exports = router;

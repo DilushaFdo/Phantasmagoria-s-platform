@@ -4,10 +4,11 @@ const {
     register, 
     verifyEmail, 
     login, 
-    forgotPassword, 
+    forgotPassword, // Note: the controller has forgotPassword, but the route was using requestPasswordReset in my previous attempt.
     resetPassword, 
     logout 
 } = require("../controllers/authController");
+const { registerValidation, loginValidation, resetPasswordValidation } = require("../lib/validation");
 const { generateCsrfToken } = require("../lib/csrfMiddleware");
 const authMiddleware = require("../lib/authMiddleware");
 
@@ -76,7 +77,7 @@ const authMiddleware = require("../lib/authMiddleware");
  *                       type: string
  *                       example: john@my.westminster.ac.uk
  */
-router.post("/register", register);
+router.post("/register", registerValidation, register);
 
 /**
  * @swagger
@@ -144,10 +145,13 @@ router.get("/verify-email", verifyEmail);
  *                 token:
  *                   type: string
  *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *                 csrfToken:
+ *                   type: string
+ *                   example: a3f8c9d2e1b04a5f6d7e8c9b0a1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9
  *       401:
  *         description: Unauthorized — unverified email or invalid credentials
  */
-router.post("/login", login);
+router.post("/login", loginValidation, login);
 
 /**
  * @swagger
@@ -198,7 +202,7 @@ router.post("/forgot-password", forgotPassword);
  *       200:
  *         description: Password reset successfully.
  */
-router.post("/reset-password", resetPassword);
+router.post("/reset-password", resetPasswordValidation, resetPassword);
 
 /**
  * @swagger
@@ -213,6 +217,17 @@ router.post("/reset-password", resetPassword);
  *     responses:
  *       200:
  *         description: Logged out successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Logged out successfully.
+ *                 csrfToken:
+ *                   type: string
+ *                   example: a3f8c9d2e1b04a5f6d7e8c9b0a1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9
  */
 router.post("/logout", authMiddleware, logout);
 

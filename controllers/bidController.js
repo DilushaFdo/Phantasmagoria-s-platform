@@ -1,6 +1,6 @@
 const { Bid, Profile } = require('../models');
 
-// Placed a new blind bid for a specific date
+// Place a new bid for a specific day
 const placeBid = async (req, res) => {
     try {
         const { target_date, bid_amount } = req.body;
@@ -15,7 +15,21 @@ const placeBid = async (req, res) => {
             return res.status(404).json({ error: 'Profile not found. Please create a profile first.' });
         }
 
-        // Check if they can still bid based on their monthly wins (Rubric: 4 for event attendees, 3 otherwise)
+        // Set the time to midnight so it's consistent for the whole day
+        const normalizedDate = new Date(target_date);
+        normalizedDate.setUTCHours(0, 0, 0, 0);
+
+        // Each user can only have one bid per day
+        const existingBid = await Bid.findOne({
+            where: { UserId: userId, target_date: normalizedDate }
+        });
+        if (existingBid) {
+            return res.status(400).json({ 
+                error: 'You already have a bid for this date. Please use the update API to change your bid amount instead.' 
+            });
+        }
+
+        // Check limits: 4 wins if they attended the event, otherwise 3
         const maxWins = profile.attended_university_event ? 4 : 3;
 
         if (profile.monthly_win_count >= maxWins) {
@@ -23,7 +37,7 @@ const placeBid = async (req, res) => {
         }
 
         const newBid = await Bid.create({
-            target_date,
+            target_date: normalizedDate,
             bid_amount,
             UserId: userId
         });
@@ -35,6 +49,7 @@ const placeBid = async (req, res) => {
     }
 };
 
+// Check if my bid is currently winning
 const getBidStatus = async (req, res) => {
     try {
         const { target_date } = req.query;
@@ -44,18 +59,21 @@ const getBidStatus = async (req, res) => {
             return res.status(400).json({ error: 'target_date is required' });
         }
 
-        // Profile might not strictly be necessary here since we're using UserId for the bid,
-        // but verifying the profile exists is good practice and follows the instruction steps.
+        // Make sure the profile exists
         const profile = await Profile.findOne({ where: { UserId: userId } });
         if (!profile) {
             return res.status(404).json({ error: 'Profile not found.' });
         }
 
-        // Finding if the user's bid is currently the highest for that date
+        // Using midnight for consistency again
+        const normalizedDate = new Date(target_date);
+        normalizedDate.setUTCHours(0, 0, 0, 0);
+
+        // Check if the user has a bid for this date
         const userBid = await Bid.findOne({
             where: {
                 UserId: userId,
-                target_date: target_date
+                target_date: normalizedDate
             }
         });
 
@@ -64,15 +82,21 @@ const getBidStatus = async (req, res) => {
         }
 
         const maxBidAmount = await Bid.max('bid_amount', {
-            where: { target_date: target_date }
+            where: { target_date: normalizedDate }
         });
 
+        // Calculate how many more times they can win this month
+        const maxWins = profile.attended_university_event ? 4 : 3;
+        const remainingSlots = Math.max(0, maxWins - profile.monthly_win_count);
+
         // Use Number() to ensure type safety, as DECIMAL column amounts might return as strings
-        if (Number(userBid.bid_amount) === Number(maxBidAmount)) {
-            return res.status(200).json({ status: "winning" });
-        } else {
-            return res.status(200).json({ status: "losing" });
-        }
+        const isWinning = Number(userBid.bid_amount) === Number(maxBidAmount);
+        
+        return res.status(200).json({ 
+            your_bid: Number(userBid.bid_amount),
+            status: isWinning ? "winning" : "losing", 
+            remaining_monthly_slots: remainingSlots 
+        });
 
     } catch (error) {
         console.error("Error fetching bid status:", error);
@@ -80,6 +104,7 @@ const getBidStatus = async (req, res) => {
     }
 };
 
+// Update the amount of an existing bid
 const updateBid = async (req, res) => {
     try {
         const { target_date, new_bid_amount } = req.body;
@@ -94,10 +119,14 @@ const updateBid = async (req, res) => {
             return res.status(404).json({ error: 'Profile not found.' });
         }
 
+        // Normalize the date to midnight
+        const normalizedDate = new Date(target_date);
+        normalizedDate.setUTCHours(0, 0, 0, 0);
+
         const existingBid = await Bid.findOne({
             where: {
                 UserId: userId,
-                target_date: target_date
+                target_date: normalizedDate
             }
         });
 
@@ -119,8 +148,118 @@ const updateBid = async (req, res) => {
     }
 };
 
+// Get all bids placed by the current user
+const getMyBids = async (req, res) => {
+    try {
+        const userId = req.user;
+
+        // Fetch bids ordered by date, newest first
+        const bids = await Bid.findAll({
+            where: { UserId: userId },
+            order: [['target_date', 'DESC']]
+        });
+
+        if (!bids || bids.length === 0) {
+            return res.status(200).json({ message: "You haven't placed any bids yet.", bids: [] });
+        }
+
+        return res.status(200).json({ bids });
+    } catch (error) {
+        console.error("Error retrieving user bids:", error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Delete a pending bid
+const deleteBid = async (req, res) => {
+    try {
+        // Normalize to midnight UTC
+        const normalizedDate = new Date(target_date);
+        normalizedDate.setUTCHours(0, 0, 0, 0);
+
+        const bid = await Bid.findOne({
+            where: {
+                target_date: normalizedDate.toISOString(),
+                UserId: req.user,
+                status: 'pending' // Only allow deleting pending bids
+            }
+        });
+
+        if (!bid) {
+            return res.status(404).json({ error: "No pending bid found for this date." });
+        }
+
+        await bid.destroy();
+        res.status(200).json({ message: "Bid deleted successfully." });
+    } catch (error) {
+        console.error("Error deleting bid:", error);
+        res.status(500).json({ error: "Failed to delete bid." });
+    }
+};
+
+// Check if I have a bid for tomorrow's slot
+const getTomorrowStatus = async (req, res) => {
+    try {
+        const tomorrow = new Date();
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+        tomorrow.setUTCHours(0, 0, 0, 0);
+
+        const bid = await Bid.findOne({
+            where: {
+                target_date: tomorrow.toISOString(),
+                UserId: req.user
+            }
+        });
+
+        if (bid) {
+            return res.status(200).json({
+                bid_placed: true,
+                amount: bid.bid_amount,
+                status: bid.status,
+                message: "You have already placed a bid for tomorrow's slot."
+            });
+        } else {
+            return res.status(200).json({
+                bid_placed: false,
+                message: "You have not placed a bid for tomorrow yet."
+            });
+        }
+    } catch (error) {
+        console.error("Error fetching tomorrow's status:", error);
+        res.status(500).json({ error: "Failed to fetch tomorrow's status." });
+    }
+};
+
+// Get remaining wins for the month
+const getMonthlyLimitStatus = async (req, res) => {
+    try {
+        const profile = await Profile.findOne({ where: { UserId: req.user } });
+        if (!profile) {
+            return res.status(404).json({ error: "Profile not found." });
+        }
+
+        // Standard limit is 3, but event attendees get 4
+        const maxWins = profile.attended_university_event ? 4 : 3;
+        const remainingSlots = Math.max(0, maxWins - profile.monthly_win_count);
+
+        res.status(200).json({
+            monthly_win_count: profile.monthly_win_count,
+            max_allowed_wins: maxWins,
+            remaining_slots: remainingSlots,
+            attended_university_event: profile.attended_university_event
+        });
+    } catch (error) {
+        console.error("Error fetching monthly limit status:", error);
+        res.status(500).json({ error: "Failed to fetch monthly limit status." });
+    }
+};
+
 module.exports = {
     placeBid,
     getBidStatus,
-    updateBid
+    updateBid,
+    getMyBids,
+    deleteBid,
+    getTomorrowStatus,
+    getMonthlyLimitStatus
 };

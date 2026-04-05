@@ -12,12 +12,12 @@ const LoginLog = require("./LoginLog");
 const Session = require("./Session");
 const CsrfToken = require("./CsrfToken");
 
-// Setting up associations between our models
-// A user has one profile and a profile belongs to a user
+// Relationships between our models
+// Users and their profiles
 User.hasOne(Profile);
 Profile.belongsTo(User);
 
-// A profile can have many degrees, certificates, etc.
+// Degrees, certificates, etc. under each profile
 Profile.hasMany(Degree);
 Degree.belongsTo(Profile);
 
@@ -41,15 +41,18 @@ Bid.belongsTo(User);
 User.hasMany(ApiKey);
 ApiKey.belongsTo(User);
 
-// Track hits for each API key separately
+// API key usage tracking
 ApiKey.hasMany(ApiUsageLog);
 ApiUsageLog.belongsTo(ApiKey);
 
-// Keep track of user logins and their active sessions
+// Sessions, logins, and CSRF token tracking
 User.hasMany(LoginLog);
 LoginLog.belongsTo(User);
 
 User.hasMany(Session);
 Session.belongsTo(User);
+
+User.hasMany(CsrfToken);
+CsrfToken.belongsTo(User);
 
 module.exports = { User, Profile, Degree, Certification, Licence, ProfessionalCourse, EmploymentHistory, Bid, ApiKey, ApiUsageLog, LoginLog, Session, CsrfToken };

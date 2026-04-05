@@ -1,5 +1,6 @@
-const { Profile, User, Degree, Certification, Licence, EmploymentHistory } = require("../models");
+const { Profile, User, Degree, Certification, Licence, ProfessionalCourse, EmploymentHistory } = require("../models");
 
+// Get the alumnus that's featured for today
 const getFeaturedAlumnus = async (req, res) => {
     try {
         const featuredProfile = await Profile.findOne({
@@ -7,11 +8,12 @@ const getFeaturedAlumnus = async (req, res) => {
             include: [
                 {
                     model: User,
-                    attributes: ["id", "username", "email"]
+                    attributes: ["id", "email"]
                 },
                 { model: Degree },
                 { model: Certification },
                 { model: Licence },
+                { model: ProfessionalCourse },
                 { model: EmploymentHistory }
             ]
         });

@@ -11,6 +11,7 @@ const ApiKey = sequelize.define("ApiKey", {
         type: DataTypes.STRING,
         allowNull: false,
         unique: true,
+        // Store the SHA-256 hash of the API key for security
     },
     status: {
         type: DataTypes.STRING,
