@@ -3,10 +3,52 @@ const router = express.Router();
 const authMiddleware = require('../lib/authMiddleware');
 const {
     generateKey,
+    listKeys,
     revokeKey,
     getUsageStats,
     getDashboardSummary
 } = require('../controllers/developerController');
+
+/**
+ * @swagger
+ * /api/developer/keys:
+ *   get:
+ *     summary: List all API keys for the authenticated user
+ *     description: Returns a list of API keys including their names, scopes, status, and last usage timestamp.
+ *     tags: [Developer]
+ *     security:
+ *       - bearerAuth: []
+ *         csrfToken: []
+ *     responses:
+ *       200:
+ *         description: API keys retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 keys:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       scopes:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       last_used:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ */
+router.get('/keys', authMiddleware, listKeys);
 
 
 /**

@@ -1,0 +1,366 @@
+<div class="row mb-4 align-items-center">
+    <div class="col">
+        <h2 class="mb-0" style="color: var(--primary);">Developer Portal</h2>
+        <p class="text-muted">Manage your API keys and monitor integration usage</p>
+    </div>
+</div>
+
+<div id="devSkeleton" class="card p-5 text-center placeholder-glow border-0 shadow-sm">
+    <div class="spinner-border text-primary mb-3 mx-auto" role="status"></div>
+    <p class="text-muted">Loading developer dashboard...</p>
+</div>
+
+<div id="devContent" class="d-none">
+    
+    <div class="row">
+        <!-- SECTION 1: Generate New API Key -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0 fw-bold" style="color: var(--primary);">Generate New Key</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form id="formGenerateKey">
+                        <div class="mb-3">
+                            <label for="keyName" class="form-label fw-bold small">Key Label</label>
+                            <input type="text" class="form-control" id="keyName" placeholder="e.g. Production Mobile App" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small d-block">Select Scopes</label>
+                            <div class="form-check mb-1">
+                                <input class="form-check-input" type="checkbox" value="read:alumni" id="scopeAlumni" checked>
+                                <label class="form-check-label small" for="scopeAlumni">read:alumni</label>
+                            </div>
+                            <div class="form-check mb-1">
+                                <input class="form-check-input" type="checkbox" value="read:analytics" id="scopeAnalytics">
+                                <label class="form-check-label small" for="scopeAnalytics">read:analytics</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="read:alumni_of_day" id="scopeDay">
+                                <label class="form-check-label small" for="scopeDay">read:alumni_of_day</label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold" id="btnGenerate">
+                            <span class="spinner-border spinner-border-sm d-none me-1" id="spinGenerate"></span> Generate API Key
+                        </button>
+                    </form>
+
+                    <!-- Success Display (Initially Hidden) -->
+                    <div id="keySuccessBox" class="mt-4 p-3 bg-light border border-success rounded d-none">
+                        <div class="alert alert-success py-2 small mb-2">
+                            <i class="bi bi-check-circle-fill me-1"></i> Key generated successfully!
+                        </div>
+                        <label class="form-label x-small text-muted fw-bold mb-1">YOUR SECRET API KEY</label>
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control form-control-sm font-monospace bg-white" id="generatedKeyDisplay" readonly>
+                            <button class="btn btn-outline-success btn-sm" id="btnCopyKey" title="Copy to clipboard">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                        <p class="text-danger x-small fw-bold mb-0">
+                            <i class="bi bi-exclamation-triangle-fill"></i> Save this key now. It will not be shown again.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: Your API Keys Table -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0 fw-bold" style="color: var(--primary);">Your API Keys</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Name</th>
+                                <th>Scopes</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Last Used</th>
+                                <th class="pe-4 text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="keysTableBody">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="keysEmptyState" class="card-body text-center py-5 d-none">
+                    <p class="text-muted">You haven't generated any API keys yet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- SECTION 3: Usage Statistics -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold" style="color: var(--primary);">API Usage Statistics</h5>
+                    <span class="badge bg-light text-dark border" id="totalHitsBadge">Total Hits: 0</span>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold small mb-3 text-uppercase text-muted">Traffic (Last 7 Days)</h6>
+                            <canvas id="usageChart" height="200"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold small mb-3 text-uppercase text-muted">Top Endpoints</h6>
+                            <div id="topEndpointsList" class="list-group list-group-flush">
+                                <!-- Injected by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: API Documentation Link -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm border-0 h-100 text-center bg-light border-primary-subtle">
+                <div class="card-body p-4 d-flex flex-column justify-content-center">
+                    <div class="mb-3">
+                        <i class="bi bi-file-earmark-code-fill text-primary" style="font-size: 3rem;"></i>
+                    </div>
+                    <h5 class="fw-bold">API Documentation</h5>
+                    <p class="text-muted small">View full API documentation and test endpoints interactively using our Swagger interface.</p>
+                    <a href="/api-docs" target="_blank" class="btn btn-outline-primary mt-2">
+                        Open Swagger UI <i class="bi bi-box-arrow-up-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+  <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="toastMsg">Success!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let globalCsrf = '';
+let toastInstance = null;
+let usageChart = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const tokenRes = await fetch('/api/auth/csrf-token');
+        const tokenData = await tokenRes.json();
+        globalCsrf = tokenData.csrfToken;
+
+        await refreshDashboard();
+
+        document.getElementById('devSkeleton').classList.add('d-none');
+        document.getElementById('devContent').classList.remove('d-none');
+    } catch (err) {
+        handleFetchError(err);
+        document.getElementById('devSkeleton').innerHTML = '<div class="alert alert-danger mx-auto">Failed to load developer dashboard. Please refresh.</div>';
+    }
+
+    // Listeners
+    document.getElementById('formGenerateKey').addEventListener('submit', handleGenerate);
+    document.getElementById('btnCopyKey').addEventListener('click', copyToClipboard);
+});
+
+async function refreshDashboard() {
+    try {
+        await Promise.all([
+            loadKeys(),
+            loadUsageStats()
+        ]);
+    } catch (err) { handleFetchError(err); }
+}
+
+async function loadKeys() {
+    const res = await fetch('/api/developer/keys');
+    const data = await res.json();
+    const tbody = document.getElementById('keysTableBody');
+    const emptyState = document.getElementById('keysEmptyState');
+    
+    if(!data.keys || data.keys.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.classList.remove('d-none');
+        return;
+    }
+
+    emptyState.classList.add('d-none');
+    tbody.innerHTML = data.keys.map(key => {
+        const statusBadge = key.status === 'active' 
+            ? '<span class="badge bg-success">Active</span>' 
+            : '<span class="badge bg-secondary">Revoked</span>';
+        
+        const createdDate = new Date(key.createdAt).toLocaleDateString('en-GB');
+        const lastUsed = key.last_used ? new Date(key.last_used).toLocaleString('en-GB') : 'Never';
+        const isRevoked = key.status === 'revoked';
+        
+        return `
+            <tr class="${isRevoked ? 'opacity-50' : ''}">
+                <td class="ps-4 fw-bold">${key.name}</td>
+                <td><small class="font-monospace text-muted x-small">${key.scopes.replace(/,/g, ', ')}</small></td>
+                <td>${statusBadge}</td>
+                <td>${createdDate}</td>
+                <td><small>${lastUsed}</small></td>
+                <td class="pe-4 text-end">
+                    ${!isRevoked ? `
+                        <button class="btn btn-sm btn-outline-danger" onclick="revokeKey(${key.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    ` : '-'}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function loadUsageStats() {
+    const [statsRes, dashboardRes] = await Promise.all([
+        fetch('/api/developer/usage-stats'),
+        fetch('/api/developer/dashboard')
+    ]);
+    
+    const stats = await statsRes.json();
+    const dashboard = await dashboardRes.json();
+    
+    document.getElementById('totalHitsBadge').textContent = `Total Hits: ${dashboard.api_usage.total_api_hits}`;
+
+    // Render Top Endpoints
+    const endpointList = document.getElementById('topEndpointsList');
+    if (!dashboard.api_usage.top_endpoints || dashboard.api_usage.top_endpoints.length === 0) {
+        endpointList.innerHTML = '<div class="alert alert-light small text-center text-muted py-4">No data available</div>';
+    } else {
+        endpointList.innerHTML = dashboard.api_usage.top_endpoints.map(ep => `
+            <div class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                <span class="text-truncate small font-monospace" style="max-width: 250px;">${ep.endpoint_accessed}</span>
+                <span class="badge bg-primary rounded-pill">${ep.hit_count}</span>
+            </div>
+        `).join('');
+    }
+
+    // Render Chart
+    renderUsageChart(stats.usageLogs || []);
+}
+
+function renderUsageChart(logs) {
+    const ctx = document.getElementById('usageChart').getContext('2d');
+    
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        last7Days.push(d.toISOString().split('T')[0]);
+    }
+
+    const counts = last7Days.map(date => {
+        return logs.filter(log => log.timestamp.split('T')[0] === date).length;
+    });
+
+    if (usageChart) usageChart.destroy();
+    
+    usageChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: last7Days.map(d => {
+                const date = new Date(d);
+                return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            }),
+            datasets: [{
+                label: 'Requests',
+                data: counts,
+                backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                borderColor: 'rgba(52, 152, 219, 1)',
+                borderWidth: 0,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } }, grid: { borderDash: [5, 5] } },
+                x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+async function handleGenerate(e) {
+    e.preventDefault();
+    const name = document.getElementById('keyName').value;
+    const scopes = [];
+    if(document.getElementById('scopeAlumni').checked) scopes.push('read:alumni');
+    if(document.getElementById('scopeAnalytics').checked) scopes.push('read:analytics');
+    if(document.getElementById('scopeDay').checked) scopes.push('read:alumni_of_day');
+
+    const btn = document.getElementById('btnGenerate');
+    setBtnLoading(btn, true);
+
+    try {
+        const res = await fetch('/api/developer/generate-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': globalCsrf },
+            body: JSON.stringify({ name, scopes })
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            document.getElementById('generatedKeyDisplay').value = data.raw_key;
+            document.getElementById('keySuccessBox').classList.remove('d-none');
+            showToast('Key generated successfully!');
+            await loadKeys();
+            document.getElementById('formGenerateKey').reset();
+        } else {
+            throw new Error(data.error || data.message || 'Failed to generate key');
+        }
+    } catch (err) {
+        handleFetchError(err);
+    } finally {
+        setBtnLoading(btn, false);
+    }
+}
+
+async function revokeKey(id) {
+    if(!confirm('Are you sure you want to revoke this API key? This action is irreversible.')) return;
+
+    try {
+        const res = await fetch(`/api/developer/revoke-key/${id}`, {
+            method: 'PUT',
+            headers: { 'X-CSRF-TOKEN': globalCsrf }
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast('API key revoked.');
+            await loadKeys();
+        } else {
+            throw new Error(data.error || data.message || 'Failed to revoke');
+        }
+    } catch (err) {
+        handleFetchError(err);
+    }
+}
+
+function copyToClipboard() {
+    const input = document.getElementById('generatedKeyDisplay');
+    input.select();
+    try {
+        navigator.clipboard.writeText(input.value);
+        showToast('Key copied to clipboard!');
+    } catch (err) {
+        document.execCommand('copy');
+        showToast('Key copied to clipboard!');
+    }
+}
+</script>

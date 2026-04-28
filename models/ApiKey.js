@@ -13,6 +13,11 @@ const ApiKey = sequelize.define("ApiKey", {
         unique: true,
         // Store the SHA-256 hash of the API key for security
     },
+    name: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "Default Key",
+    },
     status: {
         type: DataTypes.STRING,
         defaultValue: "active", // Can be 'active' or 'revoked'

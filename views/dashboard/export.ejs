@@ -1,0 +1,122 @@
+<meta name="api-key" content="<%= process.env.ANALYTICS_API_KEY %>">
+
+<div class="container-fluid">
+    <div class="row flex-nowrap">
+        <%- include('../partials/dashboardSidebar', { currentPage: 'export' }) %>
+        
+        <div class="col py-4 px-4 bg-light min-vh-100 dashboard-main">
+            <h2 class="fw-bold mb-4">Export & Reporting</h2>
+
+            <div class="row g-4">
+                <!-- SECTION 1: Export Data -->
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white py-3 border-0">
+                            <h6 class="fw-bold mb-0">Alumni Data Export</h6>
+                        </div>
+                        <div class="card-body p-4">
+                            <p class="text-muted small mb-4">Select filters to narrow down the dataset for export. This will include full profiles, employment history, and credentials.</p>
+                            
+                            <%- include('../partials/analyticsFilters') %>
+
+                            <div class="d-flex gap-3 mt-4">
+                                <button id="btnExportCSV" class="btn btn-success px-4 py-2">
+                                    <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export to CSV
+                                </button>
+                                <button id="btnExportPDF" class="btn btn-danger px-4 py-2">
+                                    <i class="bi bi-file-earmark-pdf me-2"></i> Export to PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 3: Chart Downloads -->
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 border-0">
+                            <h6 class="fw-bold mb-0">Download Live Charts</h6>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="card border-0 bg-light h-100">
+                                        <div class="card-body text-center p-3">
+                                            <i class="bi bi-bar-chart fs-1 text-primary mb-2"></i>
+                                            <h6 class="fw-bold small mb-3">Skills Gap</h6>
+                                            <a href="/dashboard/charts/skills-gap?download=true" target="_blank" class="btn btn-sm btn-outline-primary w-100">Download PNG</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-0 bg-light h-100">
+                                        <div class="card-body text-center p-3">
+                                            <i class="bi bi-briefcase fs-1 text-success mb-2"></i>
+                                            <h6 class="fw-bold small mb-3">Employment</h6>
+                                            <a href="/dashboard/charts/employment?download=true" target="_blank" class="btn btn-sm btn-outline-success w-100">Download PNG</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-0 bg-light h-100">
+                                        <div class="card-body text-center p-3">
+                                            <i class="bi bi-person-badge fs-1 text-info mb-2"></i>
+                                            <h6 class="fw-bold small mb-3">Job Titles</h6>
+                                            <a href="/dashboard/charts/job-titles?download=true" target="_blank" class="btn btn-sm btn-outline-info w-100">Download PNG</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-0 bg-light h-100">
+                                        <div class="card-body text-center p-3">
+                                            <i class="bi bi-building fs-1 text-warning mb-2"></i>
+                                            <h6 class="fw-bold small mb-3">Employers</h6>
+                                            <a href="/dashboard/charts/employers?download=true" target="_blank" class="btn btn-sm btn-outline-warning w-100">Download PNG</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-0 bg-light h-100">
+                                        <div class="card-body text-center p-3">
+                                            <i class="bi bi-globe fs-1 text-danger mb-2"></i>
+                                            <h6 class="fw-bold small mb-3">Geographic</h6>
+                                            <a href="/dashboard/charts/geographic?download=true" target="_blank" class="btn btn-sm btn-outline-danger w-100">Download PNG</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: Presets -->
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white py-3 border-0">
+                            <h6 class="fw-bold mb-0">Filter Presets</h6>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="mb-4">
+                                <label class="form-label small fw-bold">Save Current Filters</label>
+                                <div class="input-group">
+                                    <input type="text" id="presetName" class="form-control" placeholder="Preset name...">
+                                    <button class="btn btn-primary" id="btnSavePreset">Save</button>
+                                </div>
+                            </div>
+
+                            <h6 class="fw-bold small text-muted text-uppercase mb-3">Your Saved Presets</h6>
+                            <div id="presetsList" class="list-group">
+                                <!-- Injected by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PDF Export Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+<script src="/js/charts.js"></script>
+<script src="/js/export.js"></script>

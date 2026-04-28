@@ -1,0 +1,472 @@
+<div class="row mb-4 align-items-center">
+    <div class="col">
+        <h2 class="mb-0" style="color: var(--primary);">Bid Management</h2>
+        <p class="text-muted">Manage your blind bids to be featured as "Alumni of the Day"</p>
+    </div>
+</div>
+
+<div class="row" id="biddingSkeleton">
+    <div class="col-md-6 mb-4">
+        <div class="card p-5 text-center placeholder-glow border-0 shadow-sm h-100">
+            <h5 class="placeholder col-6 mb-4"></h5>
+            <div class="placeholder col-8 mb-2" style="height: 60px;"></div>
+            <p class="placeholder col-4 mb-4"></p>
+            <div class="placeholder col-12" style="height: 40px;"></div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card p-5 text-center placeholder-glow border-0 shadow-sm h-100">
+            <h5 class="placeholder col-6 mb-4"></h5>
+            <div class="placeholder col-10 mb-2" style="height: 40px;"></div>
+            <p class="placeholder col-4 mb-4"></p>
+        </div>
+    </div>
+</div>
+
+<div class="row d-none" id="biddingContent">
+    
+    <!-- SECTION 1: Current Bid Status Card -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom pt-3 pb-2 text-center">
+                <h5 class="mb-0 fw-bold" style="color: var(--primary);">Tomorrow's Slot</h5>
+                <small class="text-muted" id="tomorrowDateDisplay"></small>
+            </div>
+            
+            <div class="card-body p-4 text-center d-flex flex-column justify-content-center" id="bidCardBody">
+                
+                <!-- State A: Active Bid -->
+                <div id="activeBidState" class="d-none">
+                    <h1 class="display-3 fw-bold mb-2" style="color: var(--primary);" id="activeBidAmount">£0.00</h1>
+                    <div id="activeBidBadgeContainer" class="mb-4">
+                        <!-- Badge injected by JS -->
+                    </div>
+                    
+                    <div class="d-flex justify-content-center gap-2 mb-3">
+                        <button class="btn btn-outline-primary" id="btnToggleIncrease">Increase Bid</button>
+                        <button class="btn btn-outline-danger" id="btnCancelBid">
+                            <span class="spinner-border spinner-border-sm d-none me-1" id="spinCancel"></span> Cancel Bid
+                        </button>
+                    </div>
+
+                    <!-- Increase Form (Hidden initially) -->
+                    <form id="formIncreaseBid" class="d-none mt-3 p-3 border rounded bg-light text-start">
+                        <label for="newBidAmount" class="form-label fw-bold small">New Bid Amount</label>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">£</span>
+                            <input type="number" class="form-control" id="newBidAmount" step="0.01" required>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-sm btn-secondary" id="btnCancelIncrease">Cancel</button>
+                            <button type="submit" class="btn btn-sm btn-primary" id="btnSubmitIncrease">
+                                <span class="spinner-border spinner-border-sm d-none me-1" id="spinIncrease"></span> Confirm Increase
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- State B: No Active Bid -->
+                <div id="noBidState" class="d-none">
+                    <div class="mb-4 text-muted">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="bi bi-clock-history mb-3" viewBox="0 0 16 16">
+                          <path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022l-.074.997zm2.004.45a7.003 7.003 0 0 0-.985-.299l.219-.976c.383.086.76.2 1.126.342l-.36.933zm1.37.71a7.01 7.01 0 0 0-.439-.27l.493-.87a8.025 8.025 0 0 1 .979.654l-.615.789a6.996 6.996 0 0 0-.418-.302zm1.834 1.79a6.99 6.99 0 0 0-.653-.796l.724-.69c.27.285.52.59.747.91l-.818.576zm.744 1.352a7.08 7.08 0 0 0-.214-.468l.893-.45a7.976 7.976 0 0 1 .45 1.088l-.95.313a7.023 7.023 0 0 0-.179-.483zm.53 2.507a6.991 6.991 0 0 0-.1-1.025l.985-.17c.067.386.106.778.116 1.17l-1 .025zm-.131 1.538c.033-.17.06-.339.081-.51l.993.123a7.957 7.957 0 0 1-.23 1.155l-.964-.267c.046-.165.086-.332.12-.501zm-.952 2.379c.184-.29.346-.594.486-.908l.914.405c-.16.36-.345.706-.555 1.038l-.845-.535zm-.964 1.205c.122-.122.239-.248.35-.378l.758.653a8.073 8.073 0 0 1-.401.432l-.707-.707z"/>
+                          <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0v1z"/>
+                          <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5z"/>
+                        </svg>
+                        <h5>You have no active bid for tomorrow</h5>
+                        <p class="small">The highest bid secures the Featured Alumni spot.</p>
+                    </div>
+
+                    <form id="formPlaceBid" class="text-start bg-light p-4 rounded border">
+                        <div class="alert alert-warning py-2 small mb-3">
+                            <i class="bi bi-eye-slash-fill me-1"></i> <strong>Blind Bidding:</strong> You cannot see other bids. Enter your best amount.
+                        </div>
+                        <div class="mb-3">
+                            <label for="bidTargetDate" class="form-label fw-bold">Target Date</label>
+                            <input type="date" class="form-control" id="bidTargetDate" required>
+                            <div class="form-text">Choose the date you'd like to be featured.</div>
+                        </div>
+                        <label for="placeBidAmount" class="form-label fw-bold">Your Bid</label>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text bg-white">£</span>
+                            <input type="number" class="form-control" id="placeBidAmount" step="0.01" min="1.00" required placeholder="0.00">
+                        </div>
+                        <button type="submit" class="btn btn-accent w-100 fw-bold" id="btnPlaceBid">
+                            <span class="spinner-border spinner-border-sm d-none me-1" id="spinPlaceBid"></span> Place Bid
+                        </button>
+                    </form>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 2: Monthly Limit Status Card -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom pt-3 pb-2 text-center">
+                <h5 class="mb-0 fw-bold" style="color: var(--primary);">Monthly Win Limit</h5>
+                <small class="text-muted">Featured slots reset every month</small>
+            </div>
+            <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
+                
+                <div id="slotsVisualContainer" class="d-flex justify-content-center gap-3 mb-4">
+                    <!-- Circles injected by JS -->
+                </div>
+                
+                <h4 class="mb-2" id="slotsTextDisplay"></h4>
+                <p class="text-muted small" id="bonusSlotNote"></p>
+                
+                <div id="limitWarningBanner" class="alert alert-danger d-none mt-3 mb-0" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> You have reached your monthly limit. You cannot place new bids until next month.
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- SECTION 3: Bidding History Table -->
+<div class="row d-none" id="historyContent">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-bottom pt-3 pb-2 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold" style="color: var(--primary);">Bidding History</h5>
+                <div class="btn-group btn-group-sm" id="paginationControls">
+                    <button class="btn btn-outline-secondary" id="btnPrevPage" disabled>Prev</button>
+                    <span class="btn btn-secondary disabled" id="pageIndicator" style="background-color: #e9ecef; color: #495057; border-color: #dee2e6;">Page 1</span>
+                    <button class="btn btn-outline-secondary" id="btnNextPage" disabled>Next</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Target Date</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th class="pe-4 text-end">Result</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <!-- Rows injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="emptyHistoryState" class="text-center p-5 d-none text-muted">
+                You haven't placed any bids yet.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+  <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="toastMsg">Success!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+let globalCsrf = '';
+let currentBidAmount = 0;
+let tomorrowStr = '';
+
+// Pagination State
+let allBids = [];
+let currentPage = 1;
+const itemsPerPage = 10;
+let toastInstance = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Calculate Tomorrow's Date
+    const tmrw = new Date();
+    tmrw.setDate(tmrw.getDate() + 1);
+    tomorrowStr = tmrw.toISOString().split('T')[0];
+    
+    const displayOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('tomorrowDateDisplay').textContent = tmrw.toLocaleDateString('en-GB', displayOptions);
+    
+    // Set default and min for date picker
+    const dateInput = document.getElementById('bidTargetDate');
+    if (dateInput) {
+        dateInput.min = tomorrowStr;
+        dateInput.value = tomorrowStr;
+    }
+
+    try {
+        const tokenRes = await fetch('/api/auth/csrf-token');
+        const tokenData = await tokenRes.json();
+        globalCsrf = tokenData.csrfToken;
+
+        await Promise.all([
+            loadTomorrowBid(),
+            loadMonthlyLimit(),
+            loadHistory()
+        ]);
+
+        document.getElementById('biddingSkeleton').classList.add('d-none');
+        document.getElementById('biddingContent').classList.remove('d-none');
+        document.getElementById('historyContent').classList.remove('d-none');
+        
+    } catch (err) {
+        handleFetchError(err);
+        document.getElementById('biddingSkeleton').innerHTML = '<div class="alert alert-danger w-100 text-center">Failed to load bidding data. Please refresh.</div>';
+    }
+
+    // Attach Listeners
+    document.getElementById('formPlaceBid').addEventListener('submit', handlePlaceBid);
+    document.getElementById('formIncreaseBid').addEventListener('submit', handleIncreaseBid);
+    document.getElementById('btnCancelBid').addEventListener('click', handleCancelBid);
+    
+    document.getElementById('btnToggleIncrease').addEventListener('click', () => {
+        document.getElementById('formIncreaseBid').classList.remove('d-none');
+        document.getElementById('newBidAmount').min = (currentBidAmount + 0.01).toFixed(2);
+        document.getElementById('newBidAmount').value = (currentBidAmount + 1.00).toFixed(2);
+    });
+    document.getElementById('btnCancelIncrease').addEventListener('click', () => {
+        document.getElementById('formIncreaseBid').classList.add('d-none');
+    });
+
+    document.getElementById('btnPrevPage').addEventListener('click', () => changePage(-1));
+    document.getElementById('btnNextPage').addEventListener('click', () => changePage(1));
+});
+
+async function apiCall(url, method, bodyObj, btnId) {
+    const btn = btnId ? document.getElementById(btnId) : null;
+    if(btn) setBtnLoading(btn, true);
+    
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': globalCsrf
+            },
+            body: bodyObj ? JSON.stringify(bodyObj) : undefined
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || data.message || 'API Error');
+        return data;
+    } finally {
+        if(btn) setBtnLoading(btn, false);
+    }
+}
+
+// ── Loaders ──
+async function loadTomorrowBid() {
+    try {
+        const tRes = await fetch('/api/bids/tomorrow');
+        const tData = await tRes.json();
+
+        const activeState = document.getElementById('activeBidState');
+        const noState = document.getElementById('noBidState');
+
+        if (tData.bid_placed) {
+            currentBidAmount = Number(tData.amount);
+            document.getElementById('activeBidAmount').textContent = `£${currentBidAmount.toFixed(2)}`;
+            
+            // Fetch Status
+            const sRes = await fetch(`/api/bids/status?target_date=${tomorrowStr}`);
+            const badgeContainer = document.getElementById('activeBidBadgeContainer');
+            
+            if (sRes.ok) {
+                const sData = await sRes.json();
+                if (sData.status === 'winning') {
+                    badgeContainer.innerHTML = `<span class="badge bg-success px-4 py-2" style="font-size: 1rem;"><i class="bi bi-trophy-fill me-1"></i> WINNING</span>`;
+                } else {
+                    badgeContainer.innerHTML = `<span class="badge bg-danger px-4 py-2" style="font-size: 1rem;"><i class="bi bi-exclamation-circle me-1"></i> NOT WINNING</span>`;
+                }
+            } else {
+                badgeContainer.innerHTML = `<span class="badge bg-secondary px-4 py-2" style="font-size: 1rem;">STATUS PENDING</span>`;
+            }
+
+            document.getElementById('formIncreaseBid').classList.add('d-none');
+            activeState.classList.remove('d-none');
+            noState.classList.add('d-none');
+        } else {
+            activeState.classList.add('d-none');
+            noState.classList.remove('d-none');
+        }
+    } catch (err) { handleFetchError(err); }
+}
+
+async function loadMonthlyLimit() {
+    try {
+        const res = await fetch('/api/bids/monthly-status');
+        const data = await res.json();
+
+        const container = document.getElementById('slotsVisualContainer');
+        const textDisplay = document.getElementById('slotsTextDisplay');
+        const warning = document.getElementById('limitWarningBanner');
+        const bonusNote = document.getElementById('bonusSlotNote');
+
+        const max = data.max_allowed_wins;
+        const used = data.monthly_win_count;
+        const hasBonus = data.attended_university_event;
+
+        let html = '';
+        for(let i=0; i<max; i++) {
+            if(i < used) {
+                html += `<i class="bi bi-circle-fill fs-2" style="color: var(--primary);"></i>`;
+            } else {
+                if(i === 3 && hasBonus) {
+                    html += `<i class="bi bi-star-fill fs-2" style="color: var(--accent);"></i>`;
+                } else {
+                    html += `<i class="bi bi-circle fs-2" style="color: var(--primary);"></i>`;
+                }
+            }
+        }
+        
+        container.innerHTML = html;
+        textDisplay.textContent = `${used} of ${max} slots used this month`;
+        
+        if (hasBonus) {
+            bonusNote.innerHTML = `<span style="color: var(--accent);"><i class="bi bi-patch-check-fill me-1"></i> Bonus slot active from university event</span>`;
+        }
+
+        if (data.remaining_slots === 0) {
+            warning.classList.remove('d-none');
+            document.getElementById('btnPlaceBid').disabled = true;
+        } else {
+            warning.classList.add('d-none');
+            document.getElementById('btnPlaceBid').disabled = false;
+        }
+    } catch (err) { handleFetchError(err); }
+}
+
+async function loadHistory() {
+    try {
+        const res = await fetch('/api/bids/my-bids');
+        const data = await res.json();
+        allBids = data.bids || [];
+        currentPage = 1;
+        renderHistoryTable();
+    } catch (err) { handleFetchError(err); }
+}
+
+// ── Actions ──
+async function handlePlaceBid(e) {
+    e.preventDefault();
+    const amt = parseFloat(document.getElementById('placeBidAmount').value);
+    const selectedDate = document.getElementById('bidTargetDate').value;
+    
+    if (!selectedDate) {
+        showToast("Please select a target date.", "error");
+        return;
+    }
+
+    const target_date = new Date(selectedDate).toISOString();
+
+    try {
+        await apiCall('/api/bids/place', 'POST', { target_date, bid_amount: amt }, 'btnPlaceBid');
+        showToast('Bid placed successfully!');
+        await Promise.all([loadTomorrowBid(), loadHistory()]);
+    } catch(err) { handleFetchError(err); }
+}
+
+async function handleIncreaseBid(e) {
+    e.preventDefault();
+    const amt = parseFloat(document.getElementById('newBidAmount').value);
+    if(amt <= currentBidAmount) {
+        showToast("New amount must be higher than current bid.", "error");
+        return;
+    }
+
+    const tmrw = new Date();
+    tmrw.setDate(tmrw.getDate() + 1);
+    tmrw.setUTCHours(0, 0, 0, 0);
+    const target_date = tmrw.toISOString();
+
+    try {
+        await apiCall('/api/bids/update', 'PUT', { target_date, new_bid_amount: amt }, 'btnSubmitIncrease');
+        showToast('Bid increased successfully!');
+        await Promise.all([loadTomorrowBid(), loadHistory()]);
+    } catch(err) { handleFetchError(err); }
+}
+
+async function handleCancelBid() {
+    if(!confirm("Are you sure you want to cancel your bid for tomorrow? This cannot be undone.")) return;
+    
+    try {
+        const btn = document.getElementById('btnCancelBid');
+        setBtnLoading(btn, true);
+        
+        const res = await fetch(`/api/bids/delete?target_date=${tomorrowStr}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': globalCsrf }
+        });
+        const data = await res.json();
+        setBtnLoading(btn, false);
+        
+        if(!res.ok) throw new Error(data.error || data.message || 'API Error');
+        
+        showToast('Bid cancelled successfully.');
+        await Promise.all([loadTomorrowBid(), loadHistory()]);
+    } catch(err) { handleFetchError(err); }
+}
+
+// ── Pagination ──
+function changePage(delta) {
+    currentPage += delta;
+    renderHistoryTable();
+}
+
+function renderHistoryTable() {
+    const tbody = document.getElementById('historyTableBody');
+    const emptyState = document.getElementById('emptyHistoryState');
+    const tableContainer = document.querySelector('.table-responsive');
+    
+    if (allBids.length === 0) {
+        tableContainer.classList.add('d-none');
+        emptyState.classList.remove('d-none');
+        updatePaginationUI();
+        return;
+    }
+    
+    tableContainer.classList.remove('d-none');
+    emptyState.classList.add('d-none');
+    
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const endIdx = startIdx + itemsPerPage;
+    const pageData = allBids.slice(startIdx, endIdx);
+    
+    let html = '';
+    pageData.forEach(bid => {
+        const dStr = new Date(bid.target_date).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' });
+        
+        let rowClass = '';
+        let badgeClass = 'bg-secondary';
+        
+        if(bid.status === 'won') { rowClass = 'table-success'; badgeClass = 'bg-success'; }
+        else if(bid.status === 'lost') { rowClass = 'table-danger'; badgeClass = 'bg-danger'; }
+        else if(bid.status === 'pending') { badgeClass = 'bg-warning text-dark'; }
+        else if(bid.status === 'cancelled') { rowClass = 'table-secondary text-muted'; }
+        
+        html += `
+            <tr class="${rowClass}">
+                <td class="ps-4 fw-bold">${dStr}</td>
+                <td>£${Number(bid.bid_amount).toFixed(2)}</td>
+                <td><span class="badge ${badgeClass}">${bid.status.toUpperCase()}</span></td>
+                <td class="pe-4 text-end">
+                    ${bid.status === 'won' ? 'Featured Alumni' : (bid.status === 'lost' ? 'Outbid' : '-')}
+                </td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+    updatePaginationUI();
+}
+
+function updatePaginationUI() {
+    const maxPage = Math.ceil(allBids.length / itemsPerPage) || 1;
+    document.getElementById('pageIndicator').textContent = `Page ${currentPage} of ${maxPage}`;
+    document.getElementById('btnPrevPage').disabled = currentPage <= 1;
+    document.getElementById('btnNextPage').disabled = currentPage >= maxPage;
+}
+</script>

@@ -1,0 +1,110 @@
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card mt-5">
+            <div class="card-header text-center py-3">
+                <h4 class="mb-0">Join Alumni Influencers</h4>
+            </div>
+            <div id="registerSuccess" class="card-body p-4 text-center d-none">
+                <div class="mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="var(--accent)" class="bi bi-envelope-check" viewBox="0 0 16 16">
+                      <path d="M2 2a2 2 0 0 0-2 2v8.01A2 2 0 0 0 2 14h5.5a.5.5 0 0 0 0-1H2a1 1 0 0 1-1-.99V7l7 4.2 3.5-2.1a.5.5 0 0 0-.5-.86L7.5 10.38 1 6.48V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3.5a.5.5 0 0 0 1 0V4a2 2 0 0 0-2-2H2Zm3.708 6.208L1 11.105V5.383l4.708 2.825ZM1 4.217V4a.5.5 0 0 1 .5-.5h12a.5.5 0 0 1 .5.5v.217l-7 4.2-6-3.6Z"/>
+                      <path d="M16 12.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Zm-1.993-1.679a.5.5 0 0 0-.686.172l-1.17 1.95-.547-.547a.5.5 0 0 0-.708.708l.774.773a.75.75 0 0 0 1.174-.144l1.335-2.226a.5.5 0 0 0-.172-.686Z"/>
+                    </svg>
+                </div>
+                <h5>Check Your Email</h5>
+                <p class="text-muted">We've sent a verification link to your email address. Please click the link to activate your account.</p>
+                <a href="/login" class="btn btn-outline-primary mt-3">Back to Login</a>
+            </div>
+            
+            <div id="registerFormContainer" class="card-body p-4">
+                <div id="error-message" class="alert alert-danger d-none" role="alert"></div>
+                
+                <form id="registerForm">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">University Email</label>
+                        <input type="email" class="form-control" id="email" required placeholder="name@my.westminster.ac.uk">
+                        <div class="form-text">Must be a valid @my.westminster.ac.uk address.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" required minlength="6">
+                    </div>
+                    <div class="mb-4">
+                        <label for="confirmPassword" class="form-label">Confirm Password</label>
+                        <input type="password" class="form-control" id="confirmPassword" required minlength="6">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-accent w-100 py-2" id="submitBtn">
+                        <span class="spinner-border spinner-border-sm d-none me-2" id="loadingSpinner" role="status" aria-hidden="true"></span>
+                        Register
+                    </button>
+                </form>
+                
+                <div class="text-center mt-4">
+                    <p class="mb-0">Already have an account? <a href="/login" class="text-decoration-none fw-bold" style="color: var(--primary);">Login here</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    const submitBtn = document.getElementById('submitBtn');
+    const errorDiv = document.getElementById('error-message');
+    
+    // Client-side Validation
+    if (password !== confirmPassword) {
+        errorDiv.textContent = 'Passwords do not match.';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    if (!email.endsWith('@my.westminster.ac.uk')) {
+        errorDiv.textContent = 'Please use a valid @my.westminster.ac.uk email address.';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    // UI Loading state
+    setBtnLoading(submitBtn, true);
+    errorDiv.classList.add('d-none');
+    
+    try {
+        const tokenRes = await fetch('/api/auth/csrf-token');
+        const tokenData = await tokenRes.json();
+        const csrfToken = tokenData.csrfToken;
+
+        const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({ email, password })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok || res.status === 201) {
+            document.getElementById('registerFormContainer').classList.add('d-none');
+            document.getElementById('registerSuccess').classList.remove('d-none');
+            showToast('Registration successful! Please check your email.');
+        } else {
+            errorDiv.textContent = data.error || data.message || 'Registration failed. Please try again.';
+            errorDiv.classList.remove('d-none');
+        }
+    } catch (err) {
+        handleFetchError(err);
+        errorDiv.textContent = 'A network error occurred. Please try again.';
+        errorDiv.classList.remove('d-none');
+    } finally {
+        setBtnLoading(submitBtn, false);
+    }
+});
+</script>

@@ -1,0 +1,115 @@
+<meta name="api-key" content="<%= process.env.ANALYTICS_API_KEY %>">
+
+<div class="container-fluid">
+    <div class="row flex-nowrap">
+        <%- include('../../partials/dashboardSidebar', { currentPage: 'employment' }) %>
+        
+        <div class="col py-4 px-4 bg-light min-vh-100 dashboard-main">
+            <h2 class="fw-bold mb-4">Employment Trends</h2>
+
+            <%- include('../../partials/analyticsFilters') %>
+
+            <div id="chartsContainer">
+                <div class="row g-4">
+                    <!-- A) Doughnut Chart -->
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold mb-0">Market Share: Top Employers</h6>
+                                <button class="btn btn-sm btn-link text-decoration-none" onclick="downloadChart('employerChart', 'employer_share.png')">
+                                    <i class="bi bi-download"></i> PNG
+                                </button>
+                            </div>
+                            <div class="card-body p-4">
+                                <div style="height: 350px;">
+                                    <canvas id="employerChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Panel -->
+                    <div class="col-lg-7">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm bg-white p-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-primary bg-opacity-10 p-3 rounded me-3 text-primary">
+                                            <i class="bi bi-person-badge fs-2"></i>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted fw-bold text-uppercase x-small">Top Role</small>
+                                            <h5 class="fw-bold mb-0" id="statTopRole">--</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm bg-white p-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-success bg-opacity-10 p-3 rounded me-3 text-success">
+                                            <i class="bi bi-building-check fs-2"></i>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted fw-bold text-uppercase x-small">Top Employer</small>
+                                            <h5 class="fw-bold mb-0" id="statTopEmployer">--</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- B) Line Chart -->
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold mb-0">Alumni Growth by Key Roles</h6>
+                                <button class="btn btn-sm btn-link text-decoration-none" onclick="downloadChart('trendChart', 'employment_trends.png')">
+                                    <i class="bi bi-download"></i> PNG
+                                </button>
+                            </div>
+                            <div class="card-body p-4">
+                                <div style="height: 300px;">
+                                    <canvas id="trendChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/js/charts.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        initFilters(loadData);
+        loadData({});
+    });
+
+    async function loadData(filters) {
+        const loading = document.getElementById('loadingOverlay');
+        const content = document.getElementById('chartsContainer');
+        loading.classList.remove('d-none');
+        content.classList.add('opacity-50');
+
+        try {
+            const query = new URLSearchParams(filters).toString();
+            const res = await fetch(`/api/analytics/employment?${query}`, { headers: getAuthHeaders() });
+            const data = await res.json();
+
+            drawEmployerDoughnut('employerChart', data.topEmployers);
+            drawTrendLineChart('trendChart', data.employmentTrends);
+
+            document.getElementById('statTopRole').textContent = data.topRoles[0]?.job_title || 'None';
+            document.getElementById('statTopEmployer').textContent = data.topEmployers[0]?.company || 'None';
+
+        } catch (err) {
+            console.error(err);
+        } finally {
+            loading.classList.add('d-none');
+            content.classList.remove('opacity-50');
+        }
+    }
+</script>

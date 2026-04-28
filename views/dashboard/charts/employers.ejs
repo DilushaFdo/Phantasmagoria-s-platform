@@ -1,0 +1,139 @@
+<meta name="api-key" content="<%= process.env.ANALYTICS_API_KEY %>">
+
+<div class="container-fluid">
+    <div class="row flex-nowrap">
+        <%- include('../../partials/dashboardSidebar', { currentPage: 'employers' }) %>
+        
+        <div class="col py-4 px-4 bg-light min-vh-100 dashboard-main">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold mb-0">Employer Deep-Dive</h2>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="small text-muted fw-bold">Limit Top N:</label>
+                    <input type="number" id="employerLimit" class="form-control form-control-sm" style="width: 70px;" value="10" min="1" max="20">
+                </div>
+            </div>
+
+            <%- include('../../partials/analyticsFilters') %>
+
+            <div id="chartsContainer">
+                <div class="row g-4">
+                    <!-- A) Vertical Bar Chart -->
+                    <div class="col-lg-12">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold mb-0">Hiring Volume by Organization</h6>
+                                <button class="btn btn-sm btn-link text-decoration-none" onclick="downloadChart('employerVolumeChart', 'employer_volume.png')">
+                                    <i class="bi bi-download"></i> PNG
+                                </button>
+                            </div>
+                            <div class="card-body p-4">
+                                <div style="height: 400px;">
+                                    <canvas id="employerVolumeChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- B) Average Bid by Employer -->
+                    <div class="col-lg-8">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold mb-0">Alumni Bidding Power by Employer Background</h6>
+                                <button class="btn btn-sm btn-link text-decoration-none" onclick="downloadChart('avgBidChart', 'bidding_power.png')">
+                                    <i class="bi bi-download"></i> PNG
+                                </button>
+                            </div>
+                            <div class="card-body p-4">
+                                <div style="height: 350px;">
+                                    <canvas id="avgBidChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Panel -->
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body p-4">
+                                <h6 class="fw-bold small text-muted text-uppercase mb-3">Top Employer</h6>
+                                <h4 class="fw-bold mb-1" id="statEmployerName">--</h4>
+                                <h2 class="fw-bold text-primary mb-0" id="statEmployerCount">--</h2>
+                                <small class="text-muted">Total alumni hired</small>
+                            </div>
+                        </div>
+                        <div class="card border-0 shadow-sm bg-info bg-opacity-10">
+                            <div class="card-body p-4">
+                                <h6 class="fw-bold small text-info text-uppercase mb-3">Market Concentration</h6>
+                                <h3 class="fw-bold mb-1" id="statConcentration">--%</h3>
+                                <p class="small text-muted mb-0">Percentage of alumni employed by the top 3 companies.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/js/charts.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        initFilters(loadData);
+        loadData({});
+
+        document.getElementById('employerLimit').addEventListener('change', () => {
+            loadData({}); // Re-fetch with new limit
+        });
+    });
+
+    async function loadData(filters) {
+        const loading = document.getElementById('loadingOverlay');
+        const content = document.getElementById('chartsContainer');
+        const limit = document.getElementById('employerLimit').value;
+        loading.classList.remove('d-none');
+        content.classList.add('opacity-50');
+
+        try {
+            const query = new URLSearchParams({...filters, limit}).toString();
+            const [empRes, bidRes] = await Promise.all([
+                fetch(`/api/analytics/employment?${query}`, { headers: getAuthHeaders() }),
+                fetch(`/api/analytics/bidding`, { headers: getAuthHeaders() })
+            ]);
+
+            const empData = await empRes.json();
+            const bidData = await bidRes.json();
+
+            // Draw Employer Volume
+            const ctx1 = document.getElementById('employerVolumeChart').getContext('2d');
+            if(chartInstances['employerVolumeChart']) chartInstances['employerVolumeChart'].destroy();
+            chartInstances['employerVolumeChart'] = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: empData.topEmployers.map(e => e.company),
+                    datasets: [{ label: 'Alumni', data: empData.topEmployers.map(e => e.count), backgroundColor: '#2ecc71' }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // Draw Bids by Employer
+            drawBidsByEmployerChart('avgBidChart', empData.topEmployers, bidData.averageBidByMonth);
+
+            // Update Stats
+            const top = empData.topEmployers[0];
+            document.getElementById('statEmployerName').textContent = top?.company || 'None';
+            document.getElementById('statEmployerCount').textContent = top?.count || '0';
+            
+            // Calculate concentration
+            const top3Sum = empData.topEmployers.slice(0, 3).reduce((s, e) => s + parseInt(e.count), 0);
+            const total = empData.topEmployers.reduce((s, e) => s + parseInt(e.count), 0);
+            document.getElementById('statConcentration').textContent = total > 0 ? ((top3Sum / total) * 100).toFixed(1) + '%' : '0%';
+
+        } catch (err) {
+            console.error(err);
+        } finally {
+            loading.classList.add('d-none');
+            content.classList.remove('opacity-50');
+        }
+    }
+</script>

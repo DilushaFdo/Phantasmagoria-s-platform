@@ -31,6 +31,6 @@ const { getFeaturedAlumnus } = require('../controllers/publicApiController');
  *       404:
  *         description: No featured alumnus found for today
  */
-router.get('/alumnus-of-the-day', getFeaturedAlumnus);
+router.get('/alumnus-of-the-day', apiTrackingMiddleware('read:alumni_of_day'), getFeaturedAlumnus);
 
 module.exports = router;

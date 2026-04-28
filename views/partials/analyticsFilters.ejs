@@ -1,0 +1,40 @@
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small fw-bold">Degree Programme</label>
+                <select class="form-select" id="filterProgramme">
+                    <option value="">All Programmes</option>
+                    <!-- Populated by JS -->
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Grad Year From</label>
+                <select class="form-select" id="filterYearFrom">
+                    <option value="">Select Year</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Grad Year To</label>
+                <select class="form-select" id="filterYearTo">
+                    <option value="">Select Year</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary flex-grow-1" id="btnApplyFilters">
+                        <i class="bi bi-funnel-fill me-1"></i> Apply Filters
+                    </button>
+                    <button class="btn btn-outline-secondary" id="btnResetFilters">
+                        Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="loadingOverlay" class="text-center py-5 d-none">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p class="text-muted mt-2">Updating analysis charts...</p>
+</div>

@@ -4,6 +4,7 @@ configDotenv();
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const express = require("express");
+const path = require("path");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const swaggerUi = require("swagger-ui-express");
@@ -14,7 +15,33 @@ const { generateCsrfToken, validateCsrfToken } = require("./lib/csrfMiddleware")
 
 const app = express();
 
-app.use(helmet());
+const expressLayouts = require("express-ejs-layouts");
+
+// EJS view engine setup for dashboard pages
+app.use(expressLayouts);
+app.set("layout", "partials/layout");
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
+// Default locals
+app.locals.path = '';
+app.locals.user = null;
+
+// Serve static files (CSS, JS, images) for the dashboard
+app.use(express.static(path.join(__dirname, "public")));
+
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://cdn.jsdelivr.net", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'", "ws:", "http://localhost:*", "ws://localhost:*"]
+        }
+    }
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -24,6 +51,29 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-TOKEN"],
     credentials: true,
 }));
+
+// Global middleware to pass user data to EJS templates
+const jwt = require("jsonwebtoken");
+const { User } = require("./models");
+app.use(async (req, res, next) => {
+    res.locals.path = req.path;
+    const token = req.cookies.jwt;
+    res.locals.user = null;
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const user = await User.findByPk(decoded.id, {
+                attributes: ['id', 'email', 'is_verified']
+            });
+            if (user) {
+                res.locals.user = user.get({ plain: true });
+            }
+        } catch (error) {
+            // Token invalid or expired, leave user as null
+        }
+    }
+    next();
+});
 
 // Rate limiting so people don't spam the API
 const apiLimiter = rateLimit({
@@ -40,7 +90,7 @@ const bidRoutes = require("./routes/bidRoutes");
 const developerRoutes = require("./routes/developerRoutes");
 const publicApiRoutes = require("./routes/publicApiRoutes");
 const analyticsRoutes = require("./routes/api/analytics");
-
+const viewsRoutes = require("./routes/views");
 // Running scheduled tasks (like picking the winner)
 require("./lib/midnightTask");
 
@@ -55,7 +105,10 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/bids", bidRoutes);
 app.use("/api/developer", developerRoutes);
 app.use("/api/public", publicApiRoutes);
-app.use("/api/public", analyticsRoutes);
+app.use("/api/analytics", analyticsRoutes);
+
+// Frontend web pages (served with EJS)
+app.use("/", viewsRoutes);
 
 // Setting up Swagger for documentation
 const swaggerOptions = {
@@ -105,6 +158,11 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 }));
 
 
+
+// 404 Handler
+app.use((req, res) => {
+    res.status(404).render("404");
+});
 
 // Finally, sync with the DB and start the server!
 dbConnection.sync().then(() => {

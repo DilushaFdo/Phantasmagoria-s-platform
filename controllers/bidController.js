@@ -173,6 +173,12 @@ const getMyBids = async (req, res) => {
 // Delete a pending bid
 const deleteBid = async (req, res) => {
     try {
+        const { target_date } = req.query;
+        
+        if (!target_date) {
+            return res.status(400).json({ error: "target_date query parameter is required." });
+        }
+
         // Normalize to midnight UTC
         const normalizedDate = new Date(target_date);
         normalizedDate.setUTCHours(0, 0, 0, 0);

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alumni of the Day | Phantasmagoria</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #34495e;
+            --accent: #3498db;
+            --accent-hover: #2980b9;
+            --background: #f8f9fa;
+            --glass: rgba(255, 255, 255, 0.9);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--background);
+            color: var(--primary);
+            overflow-x: hidden;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 80vh;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            color: white;
+            padding: 80px 20px;
+            text-align: center;
+            clip-path: ellipse(150% 100% at 50% 0%);
+        }
+
+        .hero-content {
+            z-index: 2;
+            max-width: 800px;
+        }
+
+        .avatar-container {
+            width: 220px;
+            height: 220px;
+            margin: 0 auto 30px;
+            border-radius: 50%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .avatar-container:hover {
+            transform: scale(1.05);
+        }
+
+        .avatar-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 4px solid white;
+        }
+
+        .badge-today {
+            background: var(--accent);
+            color: white;
+            padding: 10px 25px;
+            border-radius: 50px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            display: inline-block;
+            box-shadow: 0 10px 20px rgba(52, 152, 219, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 10px 20px rgba(52, 152, 219, 0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 15px 30px rgba(52, 152, 219, 0.6); }
+            100% { transform: scale(1); box-shadow: 0 10px 20px rgba(52, 152, 219, 0.4); }
+        }
+
+        .alumni-name {
+            font-size: 4rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .biography {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            line-height: 1.6;
+            margin-bottom: 35px;
+        }
+
+        /* Stats Row */
+        .stats-container {
+            margin-top: -60px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 24px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--accent);
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #7f8c8d;
+            font-weight: 600;
+        }
+
+        /* Sections */
+        .section-title {
+            font-weight: 800;
+            margin-bottom: 40px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 50px;
+            height: 4px;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        .credential-card {
+            background: white;
+            border-radius: 20px;
+            border: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.03);
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+
+        .credential-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+        }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 50px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #dee2e6;
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 40px;
+        }
+
+        .timeline-marker {
+            position: absolute;
+            left: -40px;
+            top: 5px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: 4px solid white;
+            box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.2);
+        }
+
+        /* Animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s ease-out;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Empty State */
+        .empty-state {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px;
+        }
+
+        footer {
+            padding: 60px 0;
+            background: white;
+            border-top: 1px solid #eee;
+            margin-top: 80px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader" class="empty-state">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+            <h5>Retrieving today's featured alumni...</h5>
+        </div>
+    </div>
+
+    <div id="emptyContainer" class="empty-state d-none">
+        <div class="text-center">
+            <i class="bi bi-calendar-x text-muted mb-4" style="font-size: 5rem;"></i>
+            <h2 class="fw-bold mb-3">No featured alumni today</h2>
+            <p class="text-muted mb-4">The bidding for today's spot hasn't closed yet. Check back tomorrow!</p>
+            <a href="/" class="btn btn-primary px-4">Visit Platform</a>
+        </div>
+    </div>
+
+    <div id="mainContent" class="d-none">
+        
+        <!-- Hero Section -->
+        <header class="hero">
+            <div class="hero-content">
+                <div class="avatar-container fade-in">
+                    <img id="profileImg" src="" alt="Alumni Image">
+                </div>
+                <div class="badge-today fade-in">Alumni of the Day</div>
+                <h1 class="alumni-name fade-in" id="alumniName"></h1>
+                <p class="biography fade-in" id="biography"></p>
+                <div class="fade-in">
+                    <a href="" id="linkedinLink" target="_blank" class="btn btn-light btn-lg px-5 fw-bold text-primary shadow-lg">
+                        <i class="bi bi-linkedin me-2"></i> Connect on LinkedIn
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <div class="container stats-container mb-5">
+            <div class="row g-4">
+                <div class="col-6 col-lg-3 fade-in">
+                    <div class="stat-card">
+                        <span class="stat-value" id="certCount">0</span>
+                        <span class="stat-label">Certifications</span>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3 fade-in">
+                    <div class="stat-card">
+                        <span class="stat-value" id="licenceCount">0</span>
+                        <span class="stat-label">Licences</span>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3 fade-in">
+                    <div class="stat-card">
+                        <span class="stat-value" id="courseCount">0</span>
+                        <span class="stat-label">Courses</span>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3 fade-in">
+                    <div class="stat-card">
+                        <span class="stat-value" id="expYears">0</span>
+                        <span class="stat-label">Years of Exp</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <main class="container py-5">
+            
+            <div class="row g-5">
+                <!-- Left: Timeline -->
+                <div class="col-lg-5">
+                    <section class="mb-5 fade-in">
+                        <h3 class="section-title">Employment History</h3>
+                        <div class="timeline mt-4" id="employmentTimeline">
+                            <!-- Injected by JS -->
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right: Grids -->
+                <div class="col-lg-7">
+                    
+                    <section id="certSection" class="mb-5 fade-in d-none">
+                        <h3 class="section-title">Certifications</h3>
+                        <div class="row g-3 mt-1" id="certGrid"></div>
+                    </section>
+
+                    <section id="licenceSection" class="mb-5 fade-in d-none">
+                        <h3 class="section-title">Professional Licences</h3>
+                        <div class="row g-3 mt-1" id="licenceGrid"></div>
+                    </section>
+
+                    <section id="courseSection" class="mb-5 fade-in d-none">
+                        <h3 class="section-title">Specialized Courses</h3>
+                        <div class="row g-3 mt-1" id="courseGrid"></div>
+                    </section>
+
+                </div>
+            </div>
+
+        </main>
+
+        <footer class="text-center">
+            <div class="container">
+                <h4 class="fw-bold mb-3">Inspired by this journey?</h4>
+                <p class="text-muted mb-4">Join our network of elite alumni and build your legacy today.</p>
+                <a href="/register" class="btn btn-primary px-5 btn-lg">Join Phantasmagoria</a>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        // Use the API Key from the URL or local storage for the AR client simulation
+        const API_KEY = new URLSearchParams(window.location.search).get('apiKey') || 'DASHBOARD_API_KEY_PLACEHOLDER';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const res = await fetch('/api/public/alumnus-of-the-day', {
+                    headers: { 'x-api-key': API_KEY }
+                });
+
+                if (res.status === 404) {
+                    document.getElementById('loader').classList.add('d-none');
+                    document.getElementById('emptyContainer').classList.remove('d-none');
+                    return;
+                }
+
+                if (!res.ok) throw new Error('API request failed');
+
+                const data = await res.json();
+                populateData(data);
+                
+                document.getElementById('loader').classList.add('d-none');
+                document.getElementById('mainContent').classList.remove('d-none');
+                
+                initScrollAnimations();
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loader').innerHTML = '<div class="alert alert-danger">An error occurred while loading the alumni profile.</div>';
+            }
+        });
+
+        function populateData(profile) {
+            // Hero
+            document.getElementById('alumniName').textContent = profile.User?.email.split('@')[0].replace('.', ' ').toUpperCase() || 'ALUMNI';
+            document.getElementById('biography').textContent = profile.biography || 'A visionary professional dedicated to innovation and excellence.';
+            document.getElementById('profileImg').src = profile.profile_image_url || `https://ui-avatars.com/api/?name=${profile.User?.email}&background=random&size=200`;
+            document.getElementById('linkedinLink').href = profile.linkedin_url || '#';
+
+            // Counts
+            document.getElementById('certCount').textContent = profile.Certifications?.length || 0;
+            document.getElementById('licenceCount').textContent = profile.Licences?.length || 0;
+            document.getElementById('courseCount').textContent = profile.ProfessionalCourses?.length || 0;
+            
+            // Experience Calculation
+            const exp = profile.EmploymentHistories || [];
+            let totalDays = 0;
+            exp.forEach(job => {
+                const start = new Date(job.start_date);
+                const end = job.end_date ? new Date(job.end_date) : new Date();
+                totalDays += (end - start) / (1000 * 60 * 60 * 24);
+            });
+            document.getElementById('expYears').textContent = (totalDays / 365).toFixed(1);
+
+            // Timeline
+            const timeline = document.getElementById('employmentTimeline');
+            if (exp.length > 0) {
+                timeline.innerHTML = exp.sort((a,b) => new Date(b.start_date) - new Date(a.start_date)).map(job => `
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <h5 class="fw-bold mb-1">${job.job_title}</h5>
+                        <div class="text-accent fw-600 small mb-2" style="color: var(--accent);">${job.company}</div>
+                        <p class="small text-muted mb-0">${new Date(job.start_date).getFullYear()} — ${job.end_date ? new Date(job.end_date).getFullYear() : 'Present'}</p>
+                    </div>
+                `).join('');
+            } else {
+                timeline.innerHTML = '<p class="text-muted italic">No employment history available.</p>';
+            }
+
+            // Grids
+            renderGrid('Certifications', profile.Certifications, 'certGrid', 'certSection');
+            renderGrid('Licences', profile.Licences, 'licenceGrid', 'licenceSection');
+            renderGrid('ProfessionalCourses', profile.ProfessionalCourses, 'courseGrid', 'courseSection');
+        }
+
+        function renderGrid(type, items, gridId, sectionId) {
+            if (!items || items.length === 0) return;
+            
+            document.getElementById(sectionId).classList.remove('d-none');
+            const grid = document.getElementById(gridId);
+            grid.innerHTML = items.map(item => `
+                <div class="col-md-6">
+                    <div class="credential-card p-3 h-100">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-patch-check-fill text-accent me-2" style="color: var(--accent);"></i>
+                            <h6 class="fw-bold mb-0 text-truncate">${item.title || item.name}</h6>
+                        </div>
+                        <p class="x-small text-muted mb-2">Issued: ${new Date(item.completion_date || item.issued_date).toLocaleDateString()}</p>
+                        ${item.credential_url || item.url ? `<a href="${item.credential_url || item.url}" target="_blank" class="btn btn-sm btn-link p-0 text-decoration-none">View Credential <i class="bi bi-arrow-up-right"></i></a>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function initScrollAnimations() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+        }
+    </script>
+</body>
+</html>

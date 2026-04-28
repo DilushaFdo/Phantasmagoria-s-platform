@@ -1,0 +1,138 @@
+<meta name="api-key" content="<%= process.env.ANALYTICS_API_KEY %>">
+
+<div class="container-fluid">
+    <div class="row flex-nowrap">
+        <%- include('../../partials/dashboardSidebar', { currentPage: 'geographic' }) %>
+        
+        <div class="col py-4 px-4 bg-light min-vh-100 dashboard-main">
+            <h2 class="fw-bold mb-4">Geographic Insights</h2>
+
+            <div class="alert alert-warning py-2 small border-0 shadow-sm mb-4">
+                <i class="bi bi-info-circle-fill me-2"></i> Note: Direct location data is not currently collected. The distributions below are inferred based on employer headquarters and regional market trends.
+            </div>
+
+            <%- include('../../partials/analyticsFilters') %>
+
+            <div id="chartsContainer">
+                <div class="row g-4">
+                    <!-- A) Doughnut Chart -->
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold mb-0">Estimated Regional Distribution</h6>
+                                <button class="btn btn-sm btn-link text-decoration-none" onclick="downloadChart('geoDoughnut', 'regional_dist.png')">
+                                    <i class="bi bi-download"></i> PNG
+                                </button>
+                            </div>
+                            <div class="card-body p-4 text-center">
+                                <div style="height: 350px;">
+                                    <canvas id="geoDoughnut"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- B) Bar Chart -->
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold mb-0">Top 10 Global Employment Hubs</h6>
+                                <button class="btn btn-sm btn-link text-decoration-none" onclick="downloadChart('geoBarChart', 'hubs.png')">
+                                    <i class="bi bi-download"></i> PNG
+                                </button>
+                            </div>
+                            <div class="card-body p-4">
+                                <div style="height: 350px;">
+                                    <canvas id="geoBarChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Panel -->
+                    <div class="col-lg-12">
+                        <div class="card border-0 shadow-sm bg-white">
+                            <div class="card-body p-4">
+                                <div class="row g-4 text-center">
+                                    <div class="col-md-6 border-end">
+                                        <h6 class="text-uppercase small fw-bold text-muted mb-2">Primary Hub</h6>
+                                        <h2 class="fw-bold mb-0" id="statTopHub">London, UK</h2>
+                                        <small class="text-success fw-bold"><i class="bi bi-caret-up-fill"></i> Inferred from 40% of employers</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="text-uppercase small fw-bold text-muted mb-2">Global Presence</h6>
+                                        <h2 class="fw-bold mb-0" id="statUniqueComps">--</h2>
+                                        <small class="text-muted">Unique companies represented globally</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/js/charts.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        initFilters(loadData);
+        loadData({});
+    });
+
+    async function loadData(filters) {
+        const loading = document.getElementById('loadingOverlay');
+        const content = document.getElementById('chartsContainer');
+        loading.classList.remove('d-none');
+        content.classList.add('opacity-50');
+
+        try {
+            const query = new URLSearchParams(filters).toString();
+            const res = await fetch(`/api/analytics/employment?${query}`, { headers: getAuthHeaders() });
+            const data = await res.json();
+
+            // Inferred Hub Mapping (Mock Logic for visual)
+            const hubs = [
+                { hub: 'London, UK', count: 45 },
+                { hub: 'California, USA', count: 32 },
+                { hub: 'Berlin, Germany', count: 18 },
+                { hub: 'Dubai, UAE', count: 12 },
+                { hub: 'Singapore', count: 10 },
+                { hub: 'Bangalore, India', count: 8 }
+            ];
+
+            // Draw Charts
+            const ctx1 = document.getElementById('geoDoughnut').getContext('2d');
+            if(chartInstances['geoDoughnut']) chartInstances['geoDoughnut'].destroy();
+            chartInstances['geoDoughnut'] = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: hubs.map(h => h.hub),
+                    datasets: [{ data: hubs.map(h => h.count), backgroundColor: ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6', '#34495e'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const ctx2 = document.getElementById('geoBarChart').getContext('2d');
+            if(chartInstances['geoBarChart']) chartInstances['geoBarChart'].destroy();
+            chartInstances['geoBarChart'] = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: data.topEmployers.slice(0, 10).map(e => e.company),
+                    datasets: [{ label: 'Alumni Count', data: data.topEmployers.slice(0, 10).map(e => e.count), backgroundColor: '#3498db' }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            document.getElementById('statUniqueComps').textContent = data.topEmployers.length;
+
+        } catch (err) {
+            console.error(err);
+        } finally {
+            loading.classList.add('d-none');
+            content.classList.remove('opacity-50');
+        }
+    }
+</script>

@@ -1,0 +1,294 @@
+<meta name="api-key" content="<%= process.env.ANALYTICS_API_KEY %>">
+
+<div class="container-fluid">
+    <div class="row flex-nowrap">
+        <%- include('../partials/dashboardSidebar', { currentPage: 'overview' }) %>
+        
+        <div class="col py-4 px-4 bg-light min-vh-100 dashboard-main">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold mb-0">Platform Overview</h2>
+                    <p class="text-muted">Welcome back, <%= locals.user ? locals.user.email : 'User' %></p>
+                </div>
+                <div id="refreshIndicator" class="badge bg-white text-dark border p-2 d-none">
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span> Updating data...
+                </div>
+            </div>
+
+            <!-- Row 1: Summary Cards -->
+            <div class="row g-3 mb-4" id="statCards">
+                <div class="col-md-2-4 col-sm-6">
+                    <div class="card border-0 border-start border-4 border-primary shadow-sm h-100 placeholder-glow">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="bg-primary bg-opacity-10 p-2 rounded">
+                                    <i class="bi bi-people text-primary fs-4"></i>
+                                </div>
+                            </div>
+                            <h4 class="fw-bold mb-0" id="statTotalAlumni"><span class="placeholder col-6"></span></h4>
+                            <small class="text-muted text-uppercase fw-bold x-small">Total Alumni</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2-4 col-sm-6">
+                    <div class="card border-0 border-start border-4 border-success shadow-sm h-100 placeholder-glow">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="bg-success bg-opacity-10 p-2 rounded">
+                                    <i class="bi bi-currency-pound text-success fs-4"></i>
+                                </div>
+                            </div>
+                            <h4 class="fw-bold mb-0" id="statActiveBids"><span class="placeholder col-6"></span></h4>
+                            <small class="text-muted text-uppercase fw-bold x-small">Active Bids</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2-4 col-sm-6">
+                    <div class="card border-0 border-start border-4 border-warning shadow-sm h-100 placeholder-glow">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="bg-warning bg-opacity-10 p-2 rounded">
+                                    <i class="bi bi-star text-warning fs-4"></i>
+                                </div>
+                            </div>
+                            <h4 class="fw-bold mb-0 text-truncate" id="statInfluencer"><span class="placeholder col-6"></span></h4>
+                            <small class="text-muted text-uppercase fw-bold x-small">Today's Influencer</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2-4 col-sm-6">
+                    <div class="card border-0 border-start border-4 border-info shadow-sm h-100 placeholder-glow">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="bg-info bg-opacity-10 p-2 rounded">
+                                    <i class="bi bi-award text-info fs-4"></i>
+                                </div>
+                            </div>
+                            <h4 class="fw-bold mb-0 text-truncate" id="statTopCert"><span class="placeholder col-6"></span></h4>
+                            <small class="text-muted text-uppercase fw-bold x-small">Top Certification</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2-4 col-sm-6">
+                    <div class="card border-0 border-start border-4 border-danger shadow-sm h-100 placeholder-glow">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="bg-danger bg-opacity-10 p-2 rounded">
+                                    <i class="bi bi-briefcase text-danger fs-4"></i>
+                                </div>
+                            </div>
+                            <h4 class="fw-bold mb-0 text-truncate" id="statTopRole"><span class="placeholder col-6"></span></h4>
+                            <small class="text-muted text-uppercase fw-bold x-small">Most Common Role</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Charts -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-5">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white py-3 border-0">
+                            <h6 class="fw-bold mb-0">Certification Distribution</h6>
+                        </div>
+                        <div class="card-body d-flex align-items-center justify-content-center p-4">
+                            <div style="height: 300px; width: 100%;">
+                                <canvas id="certChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-7">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white py-3 border-0">
+                            <h6 class="fw-bold mb-0">Top 5 Job Roles</h6>
+                        </div>
+                        <div class="card-body p-4">
+                            <div style="height: 300px; width: 100%;">
+                                <canvas id="roleChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 3: Recent Alumni -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold mb-0">Recent Verified Alumni</h6>
+                    <a href="/dashboard/alumni" class="btn btn-sm btn-link text-decoration-none">View All</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Alumni</th>
+                                <th>Certifications</th>
+                                <th>Current Role</th>
+                                <th>Joined</th>
+                                <th class="pe-4">Profile</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentAlumniBody">
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="spinner-border text-primary spinner-border-sm me-2"></div> Loading alumni...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .col-md-2-4 {
+        width: 20%;
+    }
+    @media (max-width: 992px) {
+        .col-md-2-4 { width: 33.33%; }
+    }
+    @media (max-width: 576px) {
+        .col-md-2-4 { width: 50%; }
+    }
+    .x-small { font-size: 0.7rem; }
+    .text-accent { color: var(--accent); }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const apiKey = document.querySelector('meta[name="api-key"]').content;
+    const authHeaders = { 'Authorization': `Bearer ${apiKey}` };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        await initDashboard();
+    });
+
+    async function initDashboard() {
+        const indicator = document.getElementById('refreshIndicator');
+        indicator.classList.remove('d-none');
+
+        try {
+            await Promise.all([
+                loadOverview(),
+                loadCertChart(),
+                loadRoleChart(),
+                loadRecentAlumni()
+            ]);
+        } catch (err) {
+            console.error('Error loading dashboard:', err);
+        } finally {
+            indicator.classList.add('d-none');
+        }
+    }
+
+    async function loadOverview() {
+        const res = await fetch('/api/analytics/overview', { headers: authHeaders });
+        const data = await res.json();
+
+        document.getElementById('statTotalAlumni').textContent = data.totalAlumni;
+        document.getElementById('statActiveBids').textContent = data.totalActiveBids;
+        document.getElementById('statInfluencer').textContent = data.todayInfluencer ? data.todayInfluencer.User.email.split('@')[0] : 'None';
+        document.getElementById('statTopCert').textContent = data.mostPopularCertification ? data.mostPopularCertification.title : 'None';
+        document.getElementById('statTopRole').textContent = data.mostPopularRole ? data.mostPopularRole.job_title : 'None';
+        
+        // Remove placeholders
+        document.querySelectorAll('#statCards .placeholder-glow').forEach(el => el.classList.remove('placeholder-glow'));
+    }
+
+    async function loadCertChart() {
+        const res = await fetch('/api/analytics/certifications', { headers: authHeaders });
+        const data = await res.json();
+        
+        const top5 = data.mostPopular.slice(0, 5);
+        const ctx = document.getElementById('certChart').getContext('2d');
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: top5.map(c => c.title),
+                datasets: [{
+                    data: top5.map(c => c.count),
+                    backgroundColor: ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15, font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
+    async function loadRoleChart() {
+        const res = await fetch('/api/analytics/employment', { headers: authHeaders });
+        const data = await res.json();
+        
+        const top5 = data.topRoles.slice(0, 5);
+        const ctx = document.getElementById('roleChart').getContext('2d');
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: top5.map(r => r.job_title),
+                datasets: [{
+                    label: 'Professionals',
+                    data: top5.map(r => r.count),
+                    backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { 
+                    x: { beginAtZero: true, grid: { display: false } },
+                    y: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    async function loadRecentAlumni() {
+        const res = await fetch('/api/analytics/alumni?limit=5', { headers: authHeaders });
+        const data = await res.json();
+        
+        const tbody = document.getElementById('recentAlumniBody');
+        if (data.alumni.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4">No alumni found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.alumni.map(al => {
+            const role = al.Profile.EmploymentHistories[0]?.job_title || 'Not specified';
+            const certs = al.Profile.Certifications.length;
+            const joined = new Date(al.createdAt).toLocaleDateString();
+            
+            return `
+                <tr>
+                    <td class="ps-4">
+                        <div class="d-flex align-items-center">
+                            <img src="https://ui-avatars.com/api/?name=${al.email}&background=random" class="rounded-circle me-2" width="32">
+                            <span>${al.email}</span>
+                        </div>
+                    </td>
+                    <td><span class="badge bg-light text-dark border">${certs} Certificates</span></td>
+                    <td><small class="text-muted">${role}</small></td>
+                    <td><small>${joined}</small></td>
+                    <td class="pe-4">
+                        <a href="/profile/${al.id}" class="btn btn-sm btn-outline-primary">View</a>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+</script>

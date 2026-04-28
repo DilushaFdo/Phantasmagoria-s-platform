@@ -1,0 +1,85 @@
+<div class="col-auto col-md-3 col-xl-2 px-sm-2 px-0 bg-dark sidebar-sticky dashboard-sidebar" id="dashboardSidebar">
+    <div class="d-flex flex-column align-items-center align-items-sm-start px-3 pt-4 text-white min-vh-100">
+        <a href="/" class="d-flex align-items-center pb-4 mb-md-0 me-md-auto text-white text-decoration-none">
+            <i class="bi bi-intersect fs-3 me-2" style="color: var(--accent);"></i>
+            <span class="fs-4 d-none d-sm-inline fw-bold">Phantasmagoria</span>
+        </a>
+        <ul class="nav nav-pills flex-column mb-sm-auto mb-0 align-items-center align-items-sm-start w-100" id="menu">
+            <li class="nav-item w-100 mb-1">
+                <a href="/dashboard" class="nav-link align-middle px-3 <%= (currentPage === 'overview') ? 'active' : 'text-white' %>">
+                    <i class="bi bi-grid fs-5"></i> <span class="ms-2 d-none d-sm-inline">Overview</span>
+                </a>
+            </li>
+            <li class="nav-item w-100 mb-1">
+                <a href="/dashboard/alumni" class="nav-link px-3 align-middle <%= (currentPage === 'alumni') ? 'active' : 'text-white' %>">
+                    <i class="bi bi-people fs-5"></i> <span class="ms-2 d-none d-sm-inline">Alumni List</span>
+                </a>
+            </li>
+            <li class="nav-item w-100 mb-1">
+                <a href="/dashboard/charts/skills-gap" class="nav-link px-3 align-middle <%= (currentPage === 'skills') ? 'active' : 'text-white' %>">
+                    <i class="bi bi-bar-chart fs-5"></i> <span class="ms-2 d-none d-sm-inline">Skills Gap</span>
+                </a>
+            </li>
+            <li class="nav-item w-100 mb-1">
+                <a href="/dashboard/charts/employment" class="nav-link px-3 align-middle <%= (currentPage === 'employment') ? 'active' : 'text-white' %>">
+                    <i class="bi bi-briefcase fs-5"></i> <span class="ms-2 d-none d-sm-inline">Employment</span>
+                </a>
+            </li>
+            <li class="nav-item w-100 mb-1">
+                <a href="/dashboard/charts/job-titles" class="nav-link px-3 align-middle <%= (currentPage === 'job-titles') ? 'active' : 'text-white' %>">
+                    <i class="bi bi-person-badge fs-5"></i> <span class="ms-2 d-none d-sm-inline">Job Titles</span>
+                </a>
+            </li>
+            <li class="nav-item w-100 mb-1">
+                <a href="/dashboard/charts/employers" class="nav-link px-3 align-middle <%= (currentPage === 'employers') ? 'active' : 'text-white' %>">
+                    <i class="bi bi-building fs-5"></i> <span class="ms-2 d-none d-sm-inline">Top Employers</span>
+                </a>
+            </li>
+            <li class="nav-item w-100 mb-1">
+                <a href="/dashboard/charts/geographic" class="nav-link px-3 align-middle <%= (currentPage === 'geographic') ? 'active' : 'text-white' %>">
+                    <i class="bi bi-globe fs-5"></i> <span class="ms-2 d-none d-sm-inline">Geographic</span>
+                </a>
+            </li>
+            <li class="nav-item w-100 mb-1">
+                <a href="/dashboard/export" class="nav-link px-3 align-middle <%= (currentPage === 'export') ? 'active' : 'text-white' %>">
+                    <i class="bi bi-download fs-5"></i> <span class="ms-2 d-none d-sm-inline">Export</span>
+                </a>
+            </li>
+        </ul>
+        <hr class="w-100">
+        <div class="dropdown pb-4 w-100">
+            <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle px-2" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
+                <img src="https://ui-avatars.com/api/?name=<%= locals.user ? locals.user.email : 'User' %>&background=random" alt="hugenerd" width="30" height="30" class="rounded-circle">
+                <span class="d-none d-sm-inline ms-2 small text-truncate" style="max-width: 100px;"><%= locals.user ? locals.user.email.split('@')[0] : 'Account' %></span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser1">
+                <li><a class="dropdown-item" href="/profile">My Profile</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item" href="/logout" onclick="return confirm('Are you sure you want to sign out?')">Sign out</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Sidebar styles are now managed in main.css via .dashboard-sidebar */
+    #dashboardSidebar .nav-link.active {
+        background-color: var(--accent) !important;
+        color: white !important;
+        font-weight: 600;
+    }
+    #dashboardSidebar .nav-link:hover:not(.active) {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    .cursor-not-allowed {
+        cursor: not-allowed !important;
+    }
+    @media (max-width: 576px) {
+        .sidebar-sticky {
+            height: auto;
+            position: relative;
+        }
+    }
+</style>

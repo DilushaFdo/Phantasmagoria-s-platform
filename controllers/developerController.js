@@ -9,7 +9,7 @@ const ALLOWED_SCOPES = ["read:alumni", "read:analytics", "read:alumni_of_day"];
 // Create a new API key for a developer
 const generateKey = async (req, res) => {
     try {
-        const { scopes } = req.body; // Expecting an array of strings
+        const { scopes, name } = req.body; // Expecting an array of strings and a name
         let finalScopes = "read:alumni"; // Default scope
 
         if (scopes && Array.isArray(scopes)) {
@@ -33,7 +33,8 @@ const generateKey = async (req, res) => {
             key_string: hashedKey,
             UserId: req.user,
             status: "active",
-            scopes: finalScopes
+            scopes: finalScopes,
+            name: name || "Default Key"
         });
 
         res.status(201).json({
@@ -41,11 +42,42 @@ const generateKey = async (req, res) => {
             id: newKey.id,
             raw_key: rawKey,
             scopes: newKey.scopes,
-            status: newKey.status
+            status: newKey.status,
+            name: newKey.name
         });
     } catch (error) {
         console.error("Error generating API key:", error);
         res.status(500).json({ error: "Failed to generate API key" });
+    }
+};
+
+// List all API keys for the current user
+const listKeys = async (req, res) => {
+    try {
+        const keys = await ApiKey.findAll({
+            where: { UserId: req.user },
+            attributes: ['id', 'name', 'scopes', 'status', 'createdAt'],
+            order: [['createdAt', 'DESC']]
+        });
+
+        // For each key, get the last usage timestamp
+        const keysWithUsage = await Promise.all(keys.map(async (key) => {
+            const lastUsage = await ApiUsageLog.findOne({
+                where: { ApiKeyId: key.id },
+                order: [['timestamp', 'DESC']],
+                attributes: ['timestamp']
+            });
+
+            return {
+                ...key.toJSON(),
+                last_used: lastUsage ? lastUsage.timestamp : null
+            };
+        }));
+
+        res.status(200).json({ keys: keysWithUsage });
+    } catch (error) {
+        console.error("Error listing API keys:", error);
+        res.status(500).json({ error: "Failed to list API keys" });
     }
 };
 
@@ -168,6 +200,7 @@ const getDashboardSummary = async (req, res) => {
 
 module.exports = {
     generateKey,
+    listKeys,
     revokeKey,
     getUsageStats,
     getDashboardSummary

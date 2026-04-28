@@ -1,0 +1,174 @@
+<meta name="api-key" content="<%= process.env.ANALYTICS_API_KEY %>">
+
+<div class="container-fluid">
+    <div class="row flex-nowrap">
+        <%- include('../partials/dashboardSidebar', { currentPage: 'alumni' }) %>
+        
+        <div class="col py-4 px-4 bg-light min-vh-100 dashboard-main">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold mb-0">Alumni Directory</h2>
+                    <p class="text-muted" id="totalCount">Total verified alumni: 0</p>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <form id="filterForm" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Programme</label>
+                            <select class="form-select" id="filterProgramme">
+                                <option value="">All Programmes</option>
+                                <option value="BSc Computer Science">BSc Computer Science</option>
+                                <option value="BEng Software Engineering">BEng Software Engineering</option>
+                                <option value="BSc Information Systems">BSc Information Systems</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Graduation Year</label>
+                            <input type="number" class="form-control" id="filterYear" placeholder="e.g. 2024">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Company</label>
+                            <input type="text" class="form-control" id="filterCompany" placeholder="e.g. Google">
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Alumni Table -->
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Alumni</th>
+                                <th>Primary Degree</th>
+                                <th>Top Skill / Role</th>
+                                <th>Credentials</th>
+                                <th class="pe-4 text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alumniTableBody">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Pagination -->
+                <div class="card-footer bg-white py-3 border-0">
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination pagination-sm justify-content-center mb-0" id="pagination">
+                            <!-- Injected by JS -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const apiKey = document.querySelector('meta[name="api-key"]').content;
+    const authHeaders = { 'Authorization': `Bearer ${apiKey}` };
+    let currentPage = 1;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAlumni();
+
+        document.getElementById('filterForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            currentPage = 1;
+            showToast('Searching alumni...');
+            loadAlumni();
+        });
+    });
+
+    async function loadAlumni() {
+        const programme = document.getElementById('filterProgramme').value;
+        const year = document.getElementById('filterYear').value;
+        const company = document.getElementById('filterCompany').value;
+        const btn = document.querySelector('#filterForm button[type="submit"]');
+        
+        setBtnLoading(btn, true);
+
+        const params = new URLSearchParams({
+            page: currentPage,
+            limit: 10,
+            programme,
+            graduationYear: year,
+            company
+        });
+
+        try {
+            const res = await fetch(`/api/analytics/alumni?${params}`, { headers: authHeaders });
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.error || data.message || 'Failed to fetch alumni');
+
+            document.getElementById('totalCount').textContent = `Total verified alumni: ${data.total}`;
+            
+            const tbody = document.getElementById('alumniTableBody');
+            
+            if (!data.alumni || data.alumni.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">No alumni found matching your filters.</td></tr>';
+                renderPagination(0);
+                return;
+            }
+
+            tbody.innerHTML = data.alumni.map(al => {
+                const degree = al.Profile?.Degrees[0]?.title || 'Unknown Degree';
+                const role = al.Profile?.EmploymentHistories[0]?.job_title || 'No role specified';
+                const totalCerts = (al.Profile?.Certifications?.length || 0) + (al.Profile?.Licences?.length || 0) + (al.Profile?.ProfessionalCourses?.length || 0);
+                
+                return `
+                    <tr>
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center">
+                                <img src="https://ui-avatars.com/api/?name=${al.email}&background=random" class="rounded-circle me-3" width="40">
+                                <div>
+                                    <div class="fw-bold">${al.email}</div>
+                                    <div class="x-small text-muted">ID: #00${al.id}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><div class="small fw-600">${degree}</div></td>
+                        <td><div class="small text-muted">${role}</div></td>
+                        <td><span class="badge bg-primary rounded-pill">${totalCerts}</span></td>
+                        <td class="pe-4 text-end">
+                            <a href="/profile/${al.id}" class="btn btn-sm btn-outline-secondary">View Profile</a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            renderPagination(data.totalPages);
+        } catch (err) {
+            handleFetchError(err);
+        } finally {
+            setBtnLoading(btn, false);
+        }
+    }
+
+    function renderPagination(totalPages) {
+        const pag = document.getElementById('pagination');
+        let html = '';
+        
+        for (let i = 1; i <= totalPages; i++) {
+            html += `
+                <li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                </li>
+            `;
+        }
+        pag.innerHTML = html;
+    }
+
+    function changePage(p) {
+        currentPage = p;
+        loadAlumni();
+    }
+</script>

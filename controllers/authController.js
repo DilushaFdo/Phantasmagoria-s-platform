@@ -151,6 +151,7 @@ const login = async (req, res) => {
             secure: process.env.NODE_ENV === "production", // Secure only in production
             sameSite: "strict", // Helps prevent CSRF attacks
             maxAge: 60 * 60 * 1000, // 1 hour
+            path: "/" // Make sure it's accessible across the whole site
         });
 
         return res.status(200).json({
@@ -232,15 +233,14 @@ const resetPassword = async (req, res) => {
 const logout = async (req, res) => {
     try {
         const token = req.cookies.jwt;
-        if (!token) {
-            return res.status(401).json({ message: "Unauthorized: No active session." });
+        
+        // Clear the cookie first regardless
+        res.clearCookie("jwt", { path: "/" });
+
+        if (token) {
+            // Delete this specific session from the database
+            await Session.destroy({ where: { token } });
         }
-        
-        // Clear the cookie
-        res.clearCookie("jwt");
-        
-        // Delete this specific session from the database
-        const destroyed = await Session.destroy({ where: { token } });
 
         // Also clear any CSRF tokens tied to this user/IP to prevent session fixation or leftovers
         await CsrfToken.destroy({
@@ -251,22 +251,23 @@ const logout = async (req, res) => {
             }
         });
 
-        // Rotate CSRF Token on logout for next person or session
+        // Check if we should redirect or send JSON
+        if (req.method === 'GET') {
+            return res.redirect("/login");
+        }
+
+        // Rotate CSRF Token for the next session if it's an API call
         const newCsrfToken = await createTargetedCsrfToken(req);
 
-        if (destroyed) {
-            return res.status(200).json({ 
-                message: "Logged out successfully. Session has been terminated.",
-                csrfToken: newCsrfToken
-            });
-        } else {
-            return res.status(200).json({ 
-                message: "Logged out successfully (session was already invalid).",
-                csrfToken: newCsrfToken
-            });
-        }
+        return res.status(200).json({ 
+            message: "Logged out successfully.",
+            csrfToken: newCsrfToken
+        });
     } catch (error) {
         console.error("Logout error:", error);
+        if (req.method === 'GET') {
+            return res.redirect("/login");
+        }
         return res.status(500).json({ message: "Internal server error." });
     }
 };

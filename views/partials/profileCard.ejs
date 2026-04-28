@@ -1,0 +1,45 @@
+<%
+    const p = locals.profile || {};
+    const imagePath = p.profile_image_path || 'https://ui-avatars.com/api/?name=' + (p.User && p.User.email ? p.User.email.split('@')[0] : 'Alumni') + '&background=1e3a5f&color=fff';
+    const name = p.User && p.User.email ? p.User.email.split('@')[0] : 'Alumni Member';
+    
+    // Get top certification
+    const cert = (p.Certifications && p.Certifications.length > 0) ? p.Certifications[0].title : 'No Certifications Listed';
+    
+    // Get current role
+    let currentRole = 'Available for Opportunities';
+    let currentCompany = '';
+    
+    if (p.EmploymentHistories && p.EmploymentHistories.length > 0) {
+        // Look for jobs with no end date
+        const currentJobs = p.EmploymentHistories.filter(j => !j.end_date);
+        if (currentJobs.length > 0) {
+            currentRole = currentJobs[0].job_title;
+            currentCompany = currentJobs[0].company;
+        } else {
+            // fallback to most recent job
+            const latest = [...p.EmploymentHistories].sort((a,b) => new Date(b.start_date) - new Date(a.start_date))[0];
+            currentRole = latest.job_title;
+            currentCompany = latest.company;
+        }
+    }
+%>
+
+<div class="card h-100 text-center">
+    <div class="card-body d-flex flex-column align-items-center">
+        <img src="<%= imagePath %>" alt="Profile Image" class="rounded-circle mb-3 border border-3" style="width: 100px; height: 100px; object-fit: cover; border-color: var(--accent) !important;">
+        <h5 class="card-title fw-bold mb-1" style="color: var(--primary);"><%= name %></h5>
+        
+        <% if (currentCompany) { %>
+            <p class="text-muted mb-2 small"><%= currentRole %> at <strong><%= currentCompany %></strong></p>
+        <% } else { %>
+            <p class="text-muted mb-2 small"><%= currentRole %></p>
+        <% } %>
+        
+        <div class="mt-auto pt-3 w-100 border-top">
+            <span class="badge" style="background-color: var(--accent); color: white;">
+                <i class="bi bi-award-fill"></i> <%= cert %>
+            </span>
+        </div>
+    </div>
+</div>
