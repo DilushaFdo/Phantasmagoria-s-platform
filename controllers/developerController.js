@@ -2,13 +2,15 @@ const crypto = require("crypto");
 const { ApiKey, ApiUsageLog, LoginLog } = require("../models");
 const sequelize = require("../db");
 
-const ALLOWED_SCOPES = ["public:read", "stats:read"];
+// NOTE: Scopes updated for CW2. Any existing API keys with old scope names
+// (public:read, stats:read) will need to be regenerated with the new scopes.
+const ALLOWED_SCOPES = ["read:alumni", "read:analytics", "read:alumni_of_day"];
 
 // Create a new API key for a developer
 const generateKey = async (req, res) => {
     try {
         const { scopes } = req.body; // Expecting an array of strings
-        let finalScopes = "public:read"; // Default scope
+        let finalScopes = "read:alumni"; // Default scope
 
         if (scopes && Array.isArray(scopes)) {
             // Validate all provided scopes

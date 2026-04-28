@@ -19,7 +19,7 @@ const ApiKey = sequelize.define("ApiKey", {
     },
     scopes: {
         type: DataTypes.STRING,
-        defaultValue: "public:read", // Comma-separated list (e.g., 'public:read,stats:read')
+        defaultValue: "read:alumni", // Comma-separated list (e.g., 'read:alumni,read:analytics')
     },
 });
 

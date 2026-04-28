@@ -39,6 +39,7 @@ const profileRoutes = require("./routes/profileRoutes");
 const bidRoutes = require("./routes/bidRoutes");
 const developerRoutes = require("./routes/developerRoutes");
 const publicApiRoutes = require("./routes/publicApiRoutes");
+const analyticsRoutes = require("./routes/api/analytics");
 
 // Running scheduled tasks (like picking the winner)
 require("./lib/midnightTask");
@@ -54,6 +55,7 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/bids", bidRoutes);
 app.use("/api/developer", developerRoutes);
 app.use("/api/public", publicApiRoutes);
+app.use("/api/public", analyticsRoutes);
 
 // Setting up Swagger for documentation
 const swaggerOptions = {
@@ -92,7 +94,7 @@ const swaggerOptions = {
             },
         ],
     },
-    apis: ["./routes/*.js"],
+    apis: ["./routes/*.js", "./routes/api/*.js"],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
