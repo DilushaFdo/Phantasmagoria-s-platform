@@ -58,11 +58,16 @@
                     </svg>
                     Edit Profile
                 </a>
+
+                <!-- Sponsor Button (Visible only to Sponsors) -->
+                <button id="sponsorBtn" class="btn btn-accent w-100 mt-3 d-none" data-bs-toggle="modal" data-bs-target="#sponsorshipModal">
+                    <i class="bi bi-award me-2"></i> Sponsor this Alumnus
+                </button>
             </div>
         </div>
 
         <!-- Bid Status Card -->
-        <div class="card shadow-sm border-0 mt-4">
+        <div class="card shadow-sm border-0 mt-4" id="bidStatusCard">
             <div class="card-header text-center" style="background-color: var(--primary); color: white;">
                 <h6 class="mb-0 py-1">Featured Alumni Bid Status</h6>
             </div>
@@ -89,6 +94,23 @@
     <div class="col-md-8">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white border-bottom pt-3 pb-0">
+                <style>
+                    #profileTabs .nav-link {
+                        color: #555 !important;
+                        border: none;
+                        border-bottom: 2px solid transparent;
+                        padding: 0.8rem 1.2rem;
+                    }
+                    #profileTabs .nav-link.active {
+                        color: var(--primary) !important;
+                        border-bottom: 2px solid var(--accent);
+                        background: transparent;
+                        font-weight: 600 !important;
+                    }
+                    #profileTabs .nav-link:hover {
+                        color: var(--primary) !important;
+                    }
+                </style>
                 <ul class="nav nav-tabs border-bottom-0" id="profileTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="bio-tab" data-bs-toggle="tab" data-bs-target="#bio" type="button" role="tab" style="color: var(--primary); font-weight: 500;">Biography</button>
@@ -169,18 +191,32 @@
 </div>
 
 <script>
+const loggedInUserId = <%- JSON.stringify(locals.user ? locals.user.id : null) %>;
+const userRole = <%- JSON.stringify(locals.user ? locals.user.role : null) %>;
+let currentProfileData = null;
+
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // Fetch Profile Data
-        const res = await fetch('/api/profile');
+        // Detect if viewing a specific profile from URL
+        const pathParts = window.location.pathname.split('/');
+        const profileId = pathParts[pathParts.length - 1] === 'profile' ? null : pathParts[pathParts.length - 1];
+        
+        const fetchUrl = profileId ? `/api/profile/${profileId}` : '/api/profile';
+        const res = await fetch(fetchUrl);
         
         if (res.status === 404 || res.status === 204) {
-            window.location.href = '/profile/edit';
-            return;
+            if (!profileId) {
+                window.location.href = '/profile/edit';
+                return;
+            } else {
+                showError('Profile not found.');
+                return;
+            }
         }
 
         if (!res.ok) throw new Error('Failed to load profile');
         const data = await res.json();
+        currentProfileData = data;
 
         if (!data || !data.id) {
             showEmptyState();
@@ -219,9 +255,27 @@ function showError(msg) {
 }
 
 async function renderProfile(data) {
+    // Show/Hide Edit buttons based on ownership
+    const isOwner = loggedInUserId && (data.UserId === loggedInUserId);
+    
+    if (!isOwner) {
+        // Hide Edit Profile button
+        const editBtn = document.querySelector('a[href="/profile/edit"]');
+        if (editBtn) editBtn.classList.add('d-none');
+        
+        // Hide Bid Status card entirely
+        const bidCard = document.getElementById('bidStatusCard');
+        if (bidCard) bidCard.classList.add('d-none');
+    }
+
     // Setup Header Info
     const email = data.User && data.User.email ? data.User.email : 'Alumni';
-    const name = email.split('@')[0];
+    let name = email.split('@')[0];
+    if (data.first_name && data.last_name) {
+        name = `${data.first_name} ${data.last_name}`;
+    } else if (data.first_name) {
+        name = data.first_name;
+    }
     document.getElementById('profileName').textContent = name;
     document.getElementById('profileEmail').textContent = email;
     
@@ -318,8 +372,12 @@ async function renderProfile(data) {
     
     // Fetch Bidding Data
     fetchBiddingStatus(data);
-}
 
+    // Setup Sponsorship Modal if user is a sponsor
+    if (userRole === 'sponsor' && !isOwner) {
+        setupSponsorshipModal(data);
+    }
+}
 
 async function fetchBiddingStatus(profileData) {
     const loadingDiv = document.getElementById('bidStatusLoading');
@@ -327,27 +385,20 @@ async function fetchBiddingStatus(profileData) {
     const slotsDiv = document.getElementById('monthlySlots');
     
     try {
-        // We can use the profileData for remaining slots
         slotsDiv.textContent = profileData.remaining_monthly_slots;
-        
-        // Check tomorrow's bid
         const tomorrowRes = await fetch('/api/bids/tomorrow');
         const tData = await tomorrowRes.json();
         
         if (tData.bid_placed) {
-            // They placed a bid, fetch the status
             const tmrwDate = new Date();
             tmrwDate.setDate(tmrwDate.getDate() + 1);
             const dateStr = tmrwDate.toISOString().split('T')[0];
-            
             const statusRes = await fetch(`/api/bids/status?target_date=${dateStr}`);
             
             if (statusRes.ok) {
                 const sData = await statusRes.json();
-                
                 const badgeColor = sData.status === 'winning' ? 'bg-success' : 'bg-danger';
                 const statusText = sData.status === 'winning' ? 'Currently Winning!' : 'Currently Losing';
-                
                 contentDiv.innerHTML = `
                     <h6 class="text-muted mb-1">Tomorrow's Bid</h6>
                     <h3 class="fw-bold mb-2">£${sData.your_bid}</h3>
@@ -361,17 +412,8 @@ async function fetchBiddingStatus(profileData) {
                 `;
             }
         } else {
-            contentDiv.innerHTML = `
-                <div class="py-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="var(--accent)" class="bi bi-calendar-event mb-2" viewBox="0 0 16 16">
-                      <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1z"/>
-                      <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
-                    </svg>
-                    <p class="text-muted mb-0 small">No bid placed for tomorrow.</p>
-                </div>
-            `;
+            contentDiv.innerHTML = `<div class="py-2"><i class="bi bi-calendar-event fs-2 text-muted d-block mb-2"></i><p class="text-muted mb-0 small">No bid placed for tomorrow.</p></div>`;
         }
-        
     } catch (e) {
         console.error("Bid status error:", e);
         contentDiv.innerHTML = `<p class="text-danger small">Could not load bid status.</p>`;
@@ -380,4 +422,135 @@ async function fetchBiddingStatus(profileData) {
         contentDiv.classList.remove('d-none');
     }
 }
+
+function setupSponsorshipModal(data) {
+    const sponsorBtn = document.getElementById('sponsorBtn');
+    if (sponsorBtn) sponsorBtn.classList.remove('d-none');
+
+    const select = document.getElementById('sponsorItemSelect');
+    if (!select) return;
+
+    select.innerHTML = '<option value="" selected disabled>Choose a credential to sponsor...</option>';
+    
+    // Add Certifications
+    if (data.Certifications && data.Certifications.length > 0) {
+        const optGroup = document.createElement('optgroup');
+        optGroup.label = 'Certifications';
+        data.Certifications.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = `cert_${c.id}`;
+            opt.textContent = c.title;
+            optGroup.appendChild(opt);
+        });
+        select.appendChild(optGroup);
+    }
+
+    // Add Licences
+    if (data.Licences && data.Licences.length > 0) {
+        const optGroup = document.createElement('optgroup');
+        optGroup.label = 'Licences';
+        data.Licences.forEach(l => {
+            const opt = document.createElement('option');
+            opt.value = `lic_${l.id}`;
+            opt.textContent = l.title;
+            optGroup.appendChild(opt);
+        });
+        select.appendChild(optGroup);
+    }
+
+    if (select.options.length <= 1) {
+        select.innerHTML = '<option value="" disabled>No credentials available to sponsor.</option>';
+        document.getElementById('sendOfferBtn').disabled = true;
+    }
+}
+
+async function handleSendOffer() {
+    const itemValue = document.getElementById('sponsorItemSelect').value;
+    const amount = document.getElementById('sponsorAmount').value;
+    const message = document.getElementById('sponsorMessage').value;
+    const btn = document.getElementById('sendOfferBtn');
+
+    if (!itemValue || !amount) {
+        alert('Please select an item and enter an amount.');
+        return;
+    }
+
+    const type = itemValue.startsWith('cert_') ? 'certification' : 'licence';
+    const itemId = itemValue.split('_')[1];
+
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+
+        const res = await fetch('/api/sponsorship/create', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                profileId: currentProfileData.id,
+                amount,
+                message,
+                certificationId: type === 'certification' ? itemId : null,
+                licenceId: type === 'licence' ? itemId : null
+            })
+        });
+
+        const result = await res.json();
+        if (res.ok) {
+            alert('Sponsorship offer sent successfully!');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('sponsorshipModal'));
+            if (modal) modal.hide();
+            document.getElementById('sponsorAmount').value = '';
+            document.getElementById('sponsorMessage').value = '';
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Something went wrong.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Send Offer';
+    }
+}
 </script>
+
+<!-- Sponsorship Modal -->
+<div class="modal fade" id="sponsorshipModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-award me-2"></i> Make a Sponsorship Offer</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-4">Sponsor a specific certification or licence for this alumni. If they accept, the funds will be added to their bidding balance.</p>
+                
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Select Credential</label>
+                    <select id="sponsorItemSelect" class="form-select">
+                        <!-- Injected -->
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Offer Amount (£)</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white">£</span>
+                        <input type="number" id="sponsorAmount" class="form-control" placeholder="e.g. 500" min="1">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Message (Optional)</label>
+                    <textarea id="sponsorMessage" class="form-control" rows="3" placeholder="Tell the alumni why you want to sponsor them..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="sendOfferBtn" class="btn btn-accent px-4" onclick="handleSendOffer()">Send Offer</button>
+            </div>
+        </div>
+    </div>
+</div>

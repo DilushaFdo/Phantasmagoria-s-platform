@@ -6,15 +6,25 @@ const { Profile, Degree, Certification, Licence, ProfessionalCourse, EmploymentH
 const updateBaseProfile = async (req, res) => {
     try {
         const userId = req.user;
-        const { biography, linkedin_url, profile_image_path } = req.body;
+        const { first_name, last_name, biography, linkedin_url, profile_image_path } = req.body;
 
+        // Basic validation for names if provided
+        const nameRegex = /^[A-Za-z\s]+$/;
+        if (first_name && (!nameRegex.test(first_name) || first_name.length > 50)) {
+            return res.status(400).json({ error: 'First name must contain only letters and spaces, and be max 50 characters.' });
+        }
+        if (last_name && (!nameRegex.test(last_name) || last_name.length > 50)) {
+            return res.status(400).json({ error: 'Last name must contain only letters and spaces, and be max 50 characters.' });
+        }
 
         let [profile, created] = await Profile.findOrCreate({
             where: { UserId: userId },
-            defaults: { biography, linkedin_url, profile_image_path }
+            defaults: { first_name, last_name, biography, linkedin_url, profile_image_path }
         });
 
         if (!created) {
+            if (first_name !== undefined) profile.first_name = first_name;
+            if (last_name !== undefined) profile.last_name = last_name;
             if (biography !== undefined) profile.biography = biography;
             if (linkedin_url !== undefined) profile.linkedin_url = linkedin_url;
             if (profile_image_path !== undefined) profile.profile_image_path = profile_image_path;
@@ -314,10 +324,14 @@ const deleteProfileImage = async (req, res) => {
 // Get the whole profile with everything included
 const getProfile = async (req, res) => {
     try {
-        const userId = req.user;
+        // If an id is provided in params, use it (public view), otherwise use the session user (private view)
+        const userId = req.params.id || req.user;
+        
+        const { User } = require('../models');
         const profile = await Profile.findOne({
             where: { UserId: userId },
             include: [
+                { model: User, attributes: ['email'] },
                 { model: Degree },
                 { model: Certification },
                 { model: Licence },

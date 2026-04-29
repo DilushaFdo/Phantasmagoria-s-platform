@@ -70,8 +70,14 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         const data = await res.json();
         
         if (res.ok) {
-            // Success, redirect to profile or dashboard
-            window.location.href = '/dashboard';
+            // Success, redirect to profile or dashboard based on role
+            if (data.user && data.user.role === 'sponsor') {
+                window.location.href = '/sponsor-dashboard';
+            } else if (data.user && data.user.role === 'developer') {
+                window.location.href = '/developer';
+            } else {
+                window.location.href = '/dashboard';
+            }
         } else {
             // Display error
             errorDiv.textContent = data.error || data.message || 'Login failed. Please check your credentials.';

@@ -11,6 +11,7 @@ const ApiUsageLog = require("./ApiUsageLog");
 const LoginLog = require("./LoginLog");
 const Session = require("./Session");
 const CsrfToken = require("./CsrfToken");
+const Sponsorship = require("./Sponsorship");
 
 // Relationships between our models
 // Users and their profiles
@@ -55,4 +56,17 @@ Session.belongsTo(User);
 User.hasMany(CsrfToken);
 CsrfToken.belongsTo(User);
 
-module.exports = { User, Profile, Degree, Certification, Licence, ProfessionalCourse, EmploymentHistory, Bid, ApiKey, ApiUsageLog, LoginLog, Session, CsrfToken };
+// Sponsorship associations
+User.hasMany(Sponsorship, { foreignKey: 'SponsorId', as: 'SponsorOfferings' });
+Sponsorship.belongsTo(User, { foreignKey: 'SponsorId', as: 'Sponsor' });
+
+Profile.hasMany(Sponsorship);
+Sponsorship.belongsTo(Profile);
+
+Certification.hasMany(Sponsorship);
+Sponsorship.belongsTo(Certification);
+
+Licence.hasMany(Sponsorship);
+Sponsorship.belongsTo(Licence);
+
+module.exports = { User, Profile, Degree, Certification, Licence, ProfessionalCourse, EmploymentHistory, Bid, ApiKey, ApiUsageLog, LoginLog, Session, CsrfToken, Sponsorship };

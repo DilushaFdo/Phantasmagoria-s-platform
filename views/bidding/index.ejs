@@ -23,6 +23,15 @@
     </div>
 </div>
 
+<div class="row d-none" id="sponsorshipRow">
+    <div class="col-12" id="sponsorshipSummaryContainer">
+        <!-- Rendered by JS -->
+    </div>
+    <div class="col-12 mt-4" id="pendingOffersContainer">
+        <!-- Rendered by JS -->
+    </div>
+</div>
+
 <div class="row d-none" id="biddingContent">
     
     <!-- SECTION 1: Current Bid Status Card -->
@@ -81,16 +90,22 @@
                         <div class="alert alert-warning py-2 small mb-3">
                             <i class="bi bi-eye-slash-fill me-1"></i> <strong>Blind Bidding:</strong> You cannot see other bids. Enter your best amount.
                         </div>
+                        <div class="mb-3 text-success fw-bold small" id="maxBidAmountDisplay">
+                            <!-- injected by JS -->
+                        </div>
                         <div class="mb-3">
                             <label for="bidTargetDate" class="form-label fw-bold">Target Date</label>
                             <input type="date" class="form-control" id="bidTargetDate" required>
                             <div class="form-text">Choose the date you'd like to be featured.</div>
                         </div>
                         <label for="placeBidAmount" class="form-label fw-bold">Your Bid</label>
-                        <div class="input-group mb-3">
+                        <div class="input-group mb-2">
                             <span class="input-group-text bg-white">£</span>
                             <input type="number" class="form-control" id="placeBidAmount" step="0.01" min="1.00" required placeholder="0.00">
                         </div>
+                        <div id="bidAmountError" class="text-danger small mb-2 d-none"></div>
+                        <div id="potentialEarnings" class="text-primary small mb-3 fw-semibold"></div>
+                        
                         <button type="submit" class="btn btn-accent w-100 fw-bold" id="btnPlaceBid">
                             <span class="spinner-border spinner-border-sm d-none me-1" id="spinPlaceBid"></span> Place Bid
                         </button>
@@ -175,6 +190,7 @@
 let globalCsrf = '';
 let currentBidAmount = 0;
 let tomorrowStr = '';
+let totalAvailableSponsorship = 0;
 
 // Pagination State
 let allBids = [];
@@ -204,6 +220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         globalCsrf = tokenData.csrfToken;
 
         await Promise.all([
+            loadSponsorships(),
             loadTomorrowBid(),
             loadMonthlyLimit(),
             loadHistory()
@@ -220,6 +237,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Attach Listeners
     document.getElementById('formPlaceBid').addEventListener('submit', handlePlaceBid);
+    
+    document.getElementById('placeBidAmount').addEventListener('input', (e) => {
+        const amt = parseFloat(e.target.value) || 0;
+        const errDiv = document.getElementById('bidAmountError');
+        const earnDiv = document.getElementById('potentialEarnings');
+        const btn = document.getElementById('btnPlaceBid');
+
+        if (amt > totalAvailableSponsorship) {
+            errDiv.textContent = `Bid cannot exceed your sponsorship balance of £${totalAvailableSponsorship.toFixed(2)}`;
+            errDiv.classList.remove('d-none');
+            earnDiv.textContent = '';
+            btn.disabled = true;
+        } else {
+            errDiv.classList.add('d-none');
+            const potential = Math.max(0, totalAvailableSponsorship - amt);
+            earnDiv.textContent = `If you win with this bid, you keep: £${potential.toFixed(2)}`;
+            btn.disabled = false;
+        }
+    });
+
     document.getElementById('formIncreaseBid').addEventListener('submit', handleIncreaseBid);
     document.getElementById('btnCancelBid').addEventListener('click', handleCancelBid);
     
@@ -258,6 +295,116 @@ async function apiCall(url, method, bodyObj, btnId) {
 }
 
 // ── Loaders ──
+async function loadSponsorships() {
+    try {
+        const [sumRes, offRes] = await Promise.all([
+            fetch('/api/sponsorship/summary'),
+            fetch('/api/sponsorship/my-offers')
+        ]);
+        
+        const sumData = await sumRes.json();
+        const offData = await offRes.json();
+
+        totalAvailableSponsorship = Number(sumData.totalAvailable) || 0;
+
+        const sumContainer = document.getElementById('sponsorshipSummaryContainer');
+        if (totalAvailableSponsorship === 0) {
+            sumContainer.innerHTML = `
+                <div class="card border-warning shadow-sm">
+                    <div class="card-body bg-warning bg-opacity-10 text-dark p-4">
+                        <h5 class="fw-bold"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i> You cannot place a bid yet.</h5>
+                        <p class="mb-0">You need sponsorship offers from certification or course providers before you can bid. Your certifications and licences are visible to potential sponsors on the platform.</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('placeBidAmount').disabled = true;
+            document.getElementById('btnPlaceBid').disabled = true;
+        } else {
+            const listHtml = (sumData.sponsorships || []).map(s => `<li><strong>${s.sponsor}</strong>: £${Number(s.amount).toFixed(2)} for ${s.for}</li>`).join('');
+            sumContainer.innerHTML = `
+                <div class="card border-primary shadow-sm">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold text-primary"><i class="bi bi-wallet2 me-2"></i> Your Sponsorship Balance</h5>
+                        <h3 class="fw-bold mb-3">Total available: £${totalAvailableSponsorship.toFixed(2)}</h3>
+                        <p class="text-muted small mb-2">This is your maximum bid amount.</p>
+                        <ul class="mb-0 small">${listHtml}</ul>
+                    </div>
+                </div>
+            `;
+            document.getElementById('maxBidAmountDisplay').textContent = `Maximum bid: £${totalAvailableSponsorship.toFixed(2)}`;
+            document.getElementById('placeBidAmount').max = totalAvailableSponsorship;
+            document.getElementById('placeBidAmount').disabled = false;
+        }
+
+        const pendingOffers = offData.offers?.pending || [];
+        const pendingContainer = document.getElementById('pendingOffersContainer');
+        
+        if (pendingOffers.length > 0) {
+            let html = `
+                <div class="card shadow-sm border-0 mt-2">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="mb-0 fw-bold">Pending Sponsorship Offers</h5>
+                    </div>
+                    <ul class="list-group list-group-flush">
+            `;
+            
+            pendingOffers.forEach(o => {
+                const title = o.Certification ? o.Certification.title : (o.Licence ? o.Licence.title : 'Unknown');
+                html += `
+                    <li class="list-group-item p-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div>
+                            <div class="fw-bold">${o.Sponsor?.company_name || 'Unknown Sponsor'}</div>
+                            <div class="small text-muted">Offered for: ${title}</div>
+                            <div class="fw-bold text-success mt-1">£${Number(o.offer_amount).toFixed(2)}</div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-success me-1 px-3" onclick="respondToOffer(${o.id}, 'accept')"><i class="bi bi-check-circle"></i> Accept</button>
+                            <button class="btn btn-sm btn-danger px-3" onclick="respondToOffer(${o.id}, 'reject')"><i class="bi bi-x-circle"></i> Reject</button>
+                        </div>
+                    </li>
+                `;
+            });
+            html += `</ul></div>`;
+            pendingContainer.innerHTML = html;
+        } else {
+            pendingContainer.innerHTML = '';
+        }
+
+        document.getElementById('sponsorshipRow').classList.remove('d-none');
+    } catch (err) {
+        console.error("Error loading sponsorships:", err);
+    }
+}
+
+window.respondToOffer = async function(sponsorshipId, action) {
+    try {
+        const res = await fetch('/api/sponsorship/respond', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': globalCsrf
+            },
+            body: JSON.stringify({ sponsorshipId, action })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Action failed');
+        
+        if (action === 'accept') {
+            showToast(`Offer accepted! £${Number(data.sponsorship.offer_amount).toFixed(2)} added to your balance.`);
+        } else {
+            showToast('Offer rejected.');
+        }
+        
+        await Promise.all([
+            loadSponsorships(),
+            loadTomorrowBid()
+        ]);
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+};
+
 async function loadTomorrowBid() {
     try {
         const tRes = await fetch('/api/bids/tomorrow');

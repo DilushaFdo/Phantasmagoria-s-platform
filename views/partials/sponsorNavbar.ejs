@@ -1,0 +1,40 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm sticky-top">
+    <div class="container">
+        <a class="navbar-brand fw-bold d-flex align-items-center" href="/sponsor/dashboard">
+            <i class="bi bi-briefcase-fill me-2"></i>
+            Phantasmagoria <span class="fw-light ms-2">| Sponsors</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sponsorNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="sponsorNav">
+            <ul class="navbar-nav ms-auto align-items-center">
+                <% if (locals.sponsor) { %>
+                    <li class="nav-item">
+                        <a class="nav-link <%= locals.path === '/sponsor/alumni' ? 'active' : '' %>" href="/sponsor/alumni">Browse Alumni</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <%= locals.path === '/sponsor/dashboard' ? 'active' : '' %>" href="/sponsor/dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item ms-lg-3">
+                        <div class="d-flex align-items-center text-white bg-dark bg-opacity-25 px-3 py-2 rounded-pill">
+                            <i class="bi bi-building me-2"></i>
+                            <span class="fw-semibold"><%= locals.sponsor.company_name %></span>
+                        </div>
+                    </li>
+                    <li class="nav-item ms-lg-2">
+                        <a class="btn btn-outline-light btn-sm rounded-pill" href="/sponsor/logout">Logout</a>
+                    </li>
+                <% } else { %>
+                    <li class="nav-item">
+                        <a class="nav-link <%= locals.path === '/sponsor/login' ? 'active' : '' %>" href="/sponsor/login">Login</a>
+                    </li>
+                    <li class="nav-item ms-2">
+                        <a class="btn btn-light btn-sm text-primary rounded-pill fw-semibold px-4" href="/sponsor/register">Register Company</a>
+                    </li>
+                <% } %>
+            </ul>
+        </div>
+    </div>
+</nav>

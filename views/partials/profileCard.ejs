@@ -1,7 +1,8 @@
 <%
     const p = locals.profile || {};
-    const imagePath = p.profile_image_path || 'https://ui-avatars.com/api/?name=' + (p.User && p.User.email ? p.User.email.split('@')[0] : 'Alumni') + '&background=1e3a5f&color=fff';
-    const name = p.User && p.User.email ? p.User.email.split('@')[0] : 'Alumni Member';
+    const emailPrefix = p.User && p.User.email ? p.User.email.split('@')[0] : 'Alumni';
+    const name = (p.first_name || p.last_name) ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : emailPrefix;
+    const imagePath = p.profile_image_path || `https://ui-avatars.com/api/?name=${name}&background=1e3a5f&color=fff`;
     
     // Get top certification
     const cert = (p.Certifications && p.Certifications.length > 0) ? p.Certifications[0].title : 'No Certifications Listed';

@@ -26,6 +26,18 @@
             <div id="collapseBasic" class="accordion-collapse collapse show" aria-labelledby="headingBasic" data-bs-parent="#profileAccordion">
                 <div class="accordion-body p-4">
                     <form id="formBasicInfo">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="first_name" class="form-label fw-semibold">First Name *</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" placeholder="Enter your first name" maxlength="50" required>
+                                <div class="invalid-feedback">First name is required</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="last_name" class="form-label fw-semibold">Last Name *</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" placeholder="Enter your last name" maxlength="50" required>
+                                <div class="invalid-feedback">Last name is required</div>
+                            </div>
+                        </div>
                         <div class="mb-3">
                             <label for="biography" class="form-label">Biography</label>
                             <textarea class="form-control" id="biography" rows="4" maxlength="500"></textarea>
@@ -331,6 +343,8 @@ async function loadProfileData() {
         currentProfileData = data;
         
         // Populate Basic Info
+        document.getElementById('first_name').value = data.first_name || '';
+        document.getElementById('last_name').value = data.last_name || '';
         document.getElementById('biography').value = data.biography || '';
         document.getElementById('linkedin_url').value = data.linkedin_url || '';
         
@@ -362,10 +376,12 @@ const formatDateShort = (date) => {
 // ── Basic Info & Image Handlers ──
 async function handleBasicInfoSubmit(e) {
     e.preventDefault();
+    const first_name = document.getElementById('first_name').value;
+    const last_name = document.getElementById('last_name').value;
     const biography = document.getElementById('biography').value;
     const linkedin_url = document.getElementById('linkedin_url').value;
     try {
-        await apiCall('/api/profile', 'PUT', { biography, linkedin_url }, 'btnBasic');
+        await apiCall('/api/profile', 'PUT', { first_name, last_name, biography, linkedin_url }, 'btnBasic');
         showToast('Basic information saved!');
     } catch(err) { handleFetchError(err); }
 }

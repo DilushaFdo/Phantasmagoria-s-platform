@@ -49,8 +49,8 @@
         <hr class="w-100">
         <div class="dropdown pb-4 w-100">
             <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle px-2" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
-                <img src="https://ui-avatars.com/api/?name=<%= locals.user ? locals.user.email : 'User' %>&background=random" alt="hugenerd" width="30" height="30" class="rounded-circle">
-                <span class="d-none d-sm-inline ms-2 small text-truncate" style="max-width: 100px;"><%= locals.user ? locals.user.email.split('@')[0] : 'Account' %></span>
+                <img src="https://ui-avatars.com/api/?name=<%= locals.user ? (locals.user.first_name || locals.user.email) : 'User' %>&background=random" alt="User Profile" width="30" height="30" class="rounded-circle">
+                <span class="d-none d-sm-inline ms-2 small text-truncate" style="max-width: 100px;"><%= locals.user ? (locals.user.first_name || locals.user.email.split('@')[0]) : 'Account' %></span>
             </a>
             <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser1">
                 <li><a class="dropdown-item" href="/profile">My Profile</a></li>

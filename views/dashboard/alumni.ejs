@@ -124,14 +124,17 @@
                 const role = al.Profile?.EmploymentHistories[0]?.job_title || 'No role specified';
                 const totalCerts = (al.Profile?.Certifications?.length || 0) + (al.Profile?.Licences?.length || 0) + (al.Profile?.ProfessionalCourses?.length || 0);
                 
+                const emailPrefix = al.email.split('@')[0];
+                const fullName = (al.Profile?.first_name || al.Profile?.last_name) ? `${al.Profile.first_name || ''} ${al.Profile.last_name || ''}`.trim() : emailPrefix;
+                
                 return `
                     <tr>
                         <td class="ps-4">
                             <div class="d-flex align-items-center">
-                                <img src="https://ui-avatars.com/api/?name=${al.email}&background=random" class="rounded-circle me-3" width="40">
+                                <img src="https://ui-avatars.com/api/?name=${fullName}&background=random" class="rounded-circle me-3" width="40">
                                 <div>
-                                    <div class="fw-bold">${al.email}</div>
-                                    <div class="x-small text-muted">ID: #00${al.id}</div>
+                                    <div class="fw-bold">${fullName}</div>
+                                    <div class="x-small text-muted">${al.email}</div>
                                 </div>
                             </div>
                         </td>

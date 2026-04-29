@@ -54,7 +54,7 @@ app.use(cors({
 
 // Global middleware to pass user data to EJS templates
 const jwt = require("jsonwebtoken");
-const { User } = require("./models");
+const { User, Profile } = require("./models");
 app.use(async (req, res, next) => {
     res.locals.path = req.path;
     const token = req.cookies.jwt;
@@ -63,10 +63,14 @@ app.use(async (req, res, next) => {
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             const user = await User.findByPk(decoded.id, {
-                attributes: ['id', 'email', 'is_verified']
+                attributes: ['id', 'email', 'is_verified', 'role', 'company_name'],
+                include: [{ model: Profile, attributes: ['first_name', 'last_name'] }]
             });
             if (user) {
                 res.locals.user = user.get({ plain: true });
+                // Make name easily accessible
+                res.locals.user.first_name = user.Profile ? user.Profile.first_name : null;
+                res.locals.user.last_name = user.Profile ? user.Profile.last_name : null;
             }
         } catch (error) {
             // Token invalid or expired, leave user as null
@@ -90,6 +94,7 @@ const bidRoutes = require("./routes/bidRoutes");
 const developerRoutes = require("./routes/developerRoutes");
 const publicApiRoutes = require("./routes/publicApiRoutes");
 const analyticsRoutes = require("./routes/api/analytics");
+const sponsorshipRouter = require("./routes/api/sponsorship");
 const viewsRoutes = require("./routes/views");
 // Running scheduled tasks (like picking the winner)
 require("./lib/midnightTask");
@@ -106,6 +111,7 @@ app.use("/api/bids", bidRoutes);
 app.use("/api/developer", developerRoutes);
 app.use("/api/public", publicApiRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/sponsorship", sponsorshipRouter);
 
 // Frontend web pages (served with EJS)
 app.use("/", viewsRoutes);

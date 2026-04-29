@@ -28,6 +28,7 @@ const { profileBaseValidation, degreeValidation } = require('../lib/validation')
  *         description: Profile retrieved successfully (includes max_monthly_wins and remaining_monthly_slots)
  */
 router.get('/', authMiddleware, getProfile);
+router.get('/:id', authMiddleware, getProfile);
 
 /**
  * @swagger

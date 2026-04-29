@@ -1,0 +1,118 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>My Offers</h2>
+    <a href="/dashboard/alumni" class="btn btn-primary fw-bold">
+        <i class="bi bi-plus-lg me-1"></i> Make New Offer
+    </a>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" id="offerTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-medium" id="all-tab" data-bs-toggle="tab" data-status="all" type="button">All Offers</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-medium text-warning" id="pending-tab" data-bs-toggle="tab" data-status="pending" type="button">Pending</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-medium text-success" id="accepted-tab" data-bs-toggle="tab" data-status="accepted" type="button">Accepted</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-medium text-danger" id="rejected-tab" data-bs-toggle="tab" data-status="rejected" type="button">Rejected</button>
+    </li>
+</ul>
+
+<!-- Offers Table -->
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Alumni Name</th>
+                        <th>Certification / Licence</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Date Made</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="offersTableBody">
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2 mb-0">Loading your offers...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+let allOffers = [];
+let currentFilter = 'all';
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Setup tab listeners
+    document.querySelectorAll('#offerTabs button').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            currentFilter = e.target.getAttribute('data-status');
+            renderTable();
+        });
+    });
+    
+    await loadOffers();
+});
+
+async function loadOffers() {
+    try {
+        const res = await fetch('/api/sponsor/dashboard-data');
+        if (!res.ok) throw new Error('Failed to load offers');
+        
+        const data = await res.json();
+        // Assuming dashboard-data returns recentOffers which contains all offers for the sponsor
+        allOffers = data.recentOffers || [];
+        renderTable();
+    } catch (err) {
+        console.error(err);
+        document.getElementById('offersTableBody').innerHTML = `
+            <tr><td colspan="6" class="text-center py-4 text-danger"><i class="bi bi-exclamation-circle"></i> Error loading offers.</td></tr>
+        `;
+    }
+}
+
+function renderTable() {
+    const tbody = document.getElementById('offersTableBody');
+    tbody.innerHTML = '';
+    
+    const filteredOffers = currentFilter === 'all' 
+        ? allOffers 
+        : allOffers.filter(o => o.status === currentFilter);
+        
+    if (filteredOffers.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted">No offers found for this category.</td></tr>`;
+        return;
+    }
+    
+    filteredOffers.forEach(offer => {
+        let statusBadge = '';
+        if (offer.status === 'accepted') statusBadge = '<span class="badge bg-success">Accepted</span>';
+        else if (offer.status === 'rejected') statusBadge = '<span class="badge bg-danger">Rejected</span>';
+        else statusBadge = '<span class="badge bg-warning text-dark">Pending</span>';
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="ps-4 fw-medium">${offer.alumniName || 'Unknown'}</td>
+            <td>${offer.credentialName || 'N/A'}</td>
+            <td class="fw-bold">£${parseFloat(offer.offer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>
+            <td>${statusBadge}</td>
+            <td class="text-muted small">${new Date(offer.created_at).toLocaleDateString()}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-secondary" onclick="alert('Message sent: ${offer.message ? offer.message.replace(/'/g, "\\'") : 'None'}')">View Msg</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+</script>

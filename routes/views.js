@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../lib/authMiddleware");
+const sponsorAuth = require("../lib/sponsorAuth");
 const { logout } = require("../controllers/authController");
 
 // ── Public Views ──
@@ -35,6 +36,10 @@ router.get("/profile", authMiddleware, (req, res) => {
     res.render("profile/index");
 });
 
+router.get("/profile/:id", authMiddleware, (req, res) => {
+    res.render("profile/index");
+});
+
 router.get("/profile/edit", authMiddleware, (req, res) => {
     res.render("profile/edit");
 });
@@ -43,7 +48,9 @@ router.get("/bidding", authMiddleware, (req, res) => {
     res.render("bidding/index");
 });
 
-router.get("/developer", authMiddleware, (req, res) => {
+const roleMiddleware = require("../lib/roleMiddleware");
+
+router.get("/developer", authMiddleware, roleMiddleware(['developer', 'admin']), (req, res) => {
     res.render("developer/index");
 });
 
@@ -78,6 +85,19 @@ router.get("/dashboard/charts/geographic", authMiddleware, (req, res) => {
 
 router.get("/dashboard/export", authMiddleware, (req, res) => {
     res.render("dashboard/export");
+});
+
+// ── Sponsor Views (Protected) ──
+router.get("/sponsor-dashboard", sponsorAuth, (req, res) => {
+    res.render("sponsor/dashboard");
+});
+
+router.get("/sponsor/browse-alumni", sponsorAuth, (req, res) => {
+    res.render("sponsor/browse-alumni");
+});
+
+router.get("/sponsor/my-offers", sponsorAuth, (req, res) => {
+    res.render("sponsor/my-offers");
 });
 
 router.get("/logout", logout);

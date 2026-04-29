@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../lib/authMiddleware');
+const roleMiddleware = require('../lib/roleMiddleware');
 const {
     generateKey,
     listKeys,
@@ -48,7 +49,7 @@ const {
  *                         format: date-time
  *                         nullable: true
  */
-router.get('/keys', authMiddleware, listKeys);
+router.get('/keys', authMiddleware, roleMiddleware(['developer', 'admin']), listKeys);
 
 
 /**
@@ -101,7 +102,7 @@ router.get('/keys', authMiddleware, listKeys);
  *                       type: string
  *                       example: "public:read"
  */
-router.post('/generate-key', authMiddleware, generateKey);
+router.post('/generate-key', authMiddleware, roleMiddleware(['developer', 'admin']), generateKey);
 
 /**
  * @swagger
@@ -144,7 +145,7 @@ router.post('/generate-key', authMiddleware, generateKey);
  *       404:
  *         description: API key not found
  */
-router.put('/revoke-key/:keyId', authMiddleware, revokeKey);
+router.put('/revoke-key/:keyId', authMiddleware, roleMiddleware(['developer', 'admin']), revokeKey);
 
 /**
  * @swagger
@@ -186,7 +187,7 @@ router.put('/revoke-key/:keyId', authMiddleware, revokeKey);
  *                         format: date-time
  *                         example: "2026-04-04T08:30:00.000Z"
  */
-router.get('/usage-stats', authMiddleware, getUsageStats);
+router.get('/usage-stats', authMiddleware, roleMiddleware(['developer', 'admin']), getUsageStats);
 
 /**
  * @swagger
@@ -260,7 +261,7 @@ router.get('/usage-stats', authMiddleware, getUsageStats);
  *                             type: integer
  *                             example: 89
  */
-router.get('/dashboard', authMiddleware, getDashboardSummary);
+router.get('/dashboard', authMiddleware, roleMiddleware(['developer', 'admin']), getDashboardSummary);
 
 
 module.exports = router;

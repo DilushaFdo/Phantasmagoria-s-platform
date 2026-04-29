@@ -1,28 +1,48 @@
 <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: var(--primary);">
-    <div class="container">
-        <a class="navbar-brand fw-bold" href="<%= locals.user ? '/dashboard' : '/' %>">Alumni Influencers</a>
+    <div class="container-fluid">
+        <!-- Brand Link based on Role -->
+        <% if (!locals.user) { %>
+            <a class="navbar-brand fw-bold" href="/">Alumni Influencers</a>
+        <% } else if (locals.user.role === 'sponsor') { %>
+            <a class="navbar-brand fw-bold" href="/sponsor-dashboard">Alumni Influencers</a>
+        <% } else { %>
+            <a class="navbar-brand fw-bold" href="/dashboard">Alumni Influencers</a>
+        <% } %>
+
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
+
         <div class="collapse navbar-collapse" id="navbarNav">
+            <!-- Main navigation links -->
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 <% if (!locals.user) { %>
                     <li class="nav-item">
-                        <a class="nav-link <%= (locals.path === '/') ? 'active fw-bold' : '' %>" href="/">Home</a>
+                        <a class="nav-link <%= (locals.path === '/alumni/today') ? 'active fw-bold' : '' %>" href="/alumni/today">Alumni of the Day</a>
                     </li>
-                <% } %>
-                <li class="nav-item">
-                    <a class="nav-link <%= (locals.path === '/alumni/today') ? 'active fw-bold' : '' %>" href="/alumni/today">Alumni of the Day</a>
-                </li>
-            </ul>
-            <ul class="navbar-nav">
-                <!-- We check if a user object exists in locals to determine auth state -->
-                <% if (locals.user) { %>
+                <% } else if (locals.user.role === 'alumni') { %>
                     <li class="nav-item">
-                        <a class="nav-link <%= (locals.path === '/profile') ? 'active fw-bold' : '' %>" href="/profile">Profile</a>
+                        <a class="nav-link <%= (locals.path === '/alumni/today') ? 'active fw-bold' : '' %>" href="/alumni/today">Alumni of the Day</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <%= (locals.path && locals.path.startsWith('/dashboard')) ? 'active fw-bold' : '' %>" href="/dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <%= (locals.path === '/profile') ? 'active fw-bold' : '' %>" href="/profile">My Profile</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link <%= (locals.path === '/bidding') ? 'active fw-bold' : '' %>" href="/bidding">Bidding</a>
+                    </li>
+                <% } else if (locals.user.role === 'sponsor') { %>
+                    <li class="nav-item">
+                        <a class="nav-link <%= (locals.path === '/dashboard/alumni') ? 'active fw-bold' : '' %>" href="/dashboard/alumni">Browse Alumni</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <%= (locals.path === '/sponsor/my-offers') ? 'active fw-bold' : '' %>" href="/sponsor/my-offers">My Offers</a>
+                    </li>
+                <% } else if (locals.user.role === 'developer' || locals.user.role === 'admin') { %>
+                    <li class="nav-item">
+                        <a class="nav-link <%= (locals.path === '/alumni/today') ? 'active fw-bold' : '' %>" href="/alumni/today">Alumni of the Day</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link <%= (locals.path && locals.path.startsWith('/dashboard')) ? 'active fw-bold' : '' %>" href="/dashboard">Dashboard</a>
@@ -30,11 +50,30 @@
                     <li class="nav-item">
                         <a class="nav-link <%= (locals.path === '/developer') ? 'active fw-bold' : '' %>" href="/developer">Developer</a>
                     </li>
-                    <% if (!locals.user.is_verified) { %>
-                        <li class="nav-item">
-                            <a class="btn btn-warning btn-sm ms-lg-2 mt-2 mt-lg-1 fw-bold" href="/verify-email" style="color: var(--primary);">Verify Account</a>
-                        </li>
-                    <% } %>
+                <% } %>
+                
+                <% if (locals.user && !locals.user.is_verified) { %>
+                    <li class="nav-item">
+                        <a class="btn btn-warning btn-sm ms-lg-2 mt-2 mt-lg-1 fw-bold" href="/verify-email" style="color: var(--primary);">Verify Account</a>
+                    </li>
+                <% } %>
+            </ul>
+
+            <!-- Right corner: Logout / Login / Register -->
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                <% if (locals.user) { %>
+                    <li class="nav-item d-flex align-items-center me-3">
+                        <span class="text-light opacity-75 small">
+                            <i class="bi bi-person-circle me-1"></i>
+                            <% if (locals.user.role === 'sponsor') { %>
+                                <%= locals.user.company_name %>
+                            <% } else if (locals.user.first_name) { %>
+                                <%= locals.user.first_name %>
+                            <% } else { %>
+                                <%= locals.user.email.split('@')[0] %>
+                            <% } %>
+                        </span>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/logout" onclick="return confirm('Are you sure you want to sign out?')">Logout</a>
                     </li>

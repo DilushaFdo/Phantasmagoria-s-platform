@@ -35,7 +35,7 @@
 <body>
     <%- include('navbar') %>
 
-    <main class="container my-5">
+    <main class="<%= (locals.path && locals.path.startsWith('/dashboard')) ? 'dashboard-wrapper' : 'container my-5' %>">
         <%- body %>
     </main>
 

@@ -1,7 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { User, LoginLog, Session, CsrfToken } = require("../models");
+const { User, LoginLog, Session, CsrfToken, Profile } = require("../models");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("../lib/emailService");
 const { createTargetedCsrfToken } = require("../lib/csrfMiddleware");
 const { Op } = require("sequelize");
@@ -9,7 +9,17 @@ const { Op } = require("sequelize");
 // Register a new user, hash their password, and send a verification email
 const register = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, role, company_name, first_name, last_name } = req.body;
+
+        const assignedRole = role === 'sponsor' ? 'sponsor' : 'alumni';
+
+        if (assignedRole === 'sponsor' && !company_name) {
+            return res.status(400).json({ message: "Company name is required for sponsors." });
+        }
+
+        if (assignedRole === 'alumni' && (!first_name || !last_name)) {
+            return res.status(400).json({ message: "First name and last name are required for alumni." });
+        }
 
         // Check for duplicate email (Business logic remains, format validation moved to middleware)
         const existingUser = await User.findOne({ where: { email } });
@@ -31,8 +41,19 @@ const register = async (req, res) => {
             password_hash,
             verification_token,
             verification_token_expiry: Date.now() + 24 * 60 * 60 * 1000,
-            is_verified: false
+            is_verified: false,
+            role: assignedRole,
+            company_name: assignedRole === 'sponsor' ? company_name : null
         });
+
+        // Create empty profile with names for alumni
+        if (assignedRole === 'alumni') {
+            await Profile.create({
+                UserId: newUser.id,
+                first_name,
+                last_name
+            });
+        }
 
         // Send the actual verification email
         await sendVerificationEmail(email, verification_token);
@@ -156,7 +177,7 @@ const login = async (req, res) => {
 
         return res.status(200).json({
             message: "Login successful.",
-            user: { id: user.id, email: user.email },
+            user: { id: user.id, email: user.email, role: user.role },
             csrfToken: newCsrfToken
         });
     } catch (error) {

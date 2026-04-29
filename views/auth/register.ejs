@@ -20,10 +20,43 @@
                 <div id="error-message" class="alert alert-danger d-none" role="alert"></div>
                 
                 <form id="registerForm">
+                    <div class="mb-4 text-center">
+                        <label class="form-label fw-bold mb-3">I am registering as:</label>
+                        <div class="d-flex justify-content-center gap-3">
+                            <input type="radio" class="btn-check" name="role" id="roleAlumni" value="alumni" autocomplete="off" checked>
+                            <label class="btn btn-outline-primary p-3 rounded" for="roleAlumni" style="width: 200px;">
+                                <div class="fs-4 mb-2">🎓 Alumni</div>
+                                <div class="small">I am a graduate of the university</div>
+                            </label>
+
+                            <input type="radio" class="btn-check" name="role" id="roleSponsor" value="sponsor" autocomplete="off">
+                            <label class="btn btn-outline-primary p-3 rounded" for="roleSponsor" style="width: 200px;">
+                                <div class="fs-4 mb-2">🏢 Sponsor/Company</div>
+                                <div class="small">I represent a certification or course provider</div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="alumniFields" class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="firstName" class="form-label">First Name</label>
+                            <input type="text" class="form-control" id="firstName" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="lastName" class="form-label">Last Name</label>
+                            <input type="text" class="form-control" id="lastName" required>
+                        </div>
+                    </div>
+
+                    <div id="sponsorFields" class="mb-3 d-none">
+                        <label for="companyName" class="form-label">Company Name</label>
+                        <input type="text" class="form-control" id="companyName">
+                    </div>
+
                     <div class="mb-3">
-                        <label for="email" class="form-label">University Email</label>
-                        <input type="email" class="form-control" id="email" required placeholder="name@my.westminster.ac.uk">
-                        <div class="form-text">Must be a valid @my.westminster.ac.uk address.</div>
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="email" required placeholder="name@example.com">
+                        <div id="emailHelp" class="form-text">For alumni, use your @my.westminster.ac.uk address.</div>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
@@ -49,9 +82,45 @@
 </div>
 
 <script>
+// Role selection toggle logic
+document.querySelectorAll('input[name="role"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        const role = e.target.value;
+        const alumniFields = document.getElementById('alumniFields');
+        const sponsorFields = document.getElementById('sponsorFields');
+        const emailHelp = document.getElementById('emailHelp');
+        
+        const firstName = document.getElementById('firstName');
+        const lastName = document.getElementById('lastName');
+        const companyName = document.getElementById('companyName');
+
+        if (role === 'alumni') {
+            alumniFields.classList.remove('d-none');
+            sponsorFields.classList.add('d-none');
+            emailHelp.textContent = 'For alumni, use your @my.westminster.ac.uk address.';
+            
+            firstName.required = true;
+            lastName.required = true;
+            companyName.required = false;
+        } else {
+            alumniFields.classList.add('d-none');
+            sponsorFields.classList.remove('d-none');
+            emailHelp.textContent = 'Use your professional company email address.';
+            
+            firstName.required = false;
+            lastName.required = false;
+            companyName.required = true;
+        }
+    });
+});
+
 document.getElementById('registerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    const role = document.querySelector('input[name="role"]:checked').value;
+    const firstName = document.getElementById('firstName').value;
+    const lastName = document.getElementById('lastName').value;
+    const companyName = document.getElementById('companyName').value;
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
@@ -65,7 +134,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         return;
     }
     
-    if (!email.endsWith('@my.westminster.ac.uk')) {
+    if (role === 'alumni' && !email.endsWith('@my.westminster.ac.uk')) {
         errorDiv.textContent = 'Please use a valid @my.westminster.ac.uk email address.';
         errorDiv.classList.remove('d-none');
         return;
@@ -80,13 +149,21 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         const tokenData = await tokenRes.json();
         const csrfToken = tokenData.csrfToken;
 
+        const payload = { role, email, password };
+        if (role === 'alumni') {
+            payload.first_name = firstName;
+            payload.last_name = lastName;
+        } else {
+            payload.company_name = companyName;
+        }
+
         const res = await fetch('/api/auth/register', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
             },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify(payload)
         });
         
         const data = await res.json();

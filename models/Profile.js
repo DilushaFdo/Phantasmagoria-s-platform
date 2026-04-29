@@ -7,6 +7,14 @@ const Profile = sequelize.define("Profile", {
         primaryKey: true,
         autoIncrement: true,
     },
+    first_name: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    last_name: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
     biography: {
         type: DataTypes.TEXT,
         allowNull: true,
@@ -32,5 +40,18 @@ const Profile = sequelize.define("Profile", {
         defaultValue: false,
     },
 });
+
+Profile.prototype.getTotalSponsorshipAmount = async function() {
+    const sponsorships = await sequelize.models.Sponsorship.findAll({
+        where: {
+            ProfileId: this.id,
+            status: 'accepted'
+        }
+    });
+    
+    return sponsorships.reduce((total, sponsorship) => {
+        return total + Number(sponsorship.offer_amount);
+    }, 0);
+};
 
 module.exports = Profile;

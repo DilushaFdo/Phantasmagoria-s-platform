@@ -9,7 +9,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h2 class="fw-bold mb-0">Platform Overview</h2>
-                    <p class="text-muted">Welcome back, <%= locals.user ? locals.user.email : 'User' %></p>
+                    <p class="text-muted">Welcome back, <%= locals.user ? (locals.user.first_name || locals.user.email.split('@')[0]) : 'User' %></p>
                 </div>
                 <div id="refreshIndicator" class="badge bg-white text-dark border p-2 d-none">
                     <span class="spinner-border spinner-border-sm me-2" role="status"></span> Updating data...
@@ -192,7 +192,13 @@
 
         document.getElementById('statTotalAlumni').textContent = data.totalAlumni;
         document.getElementById('statActiveBids').textContent = data.totalActiveBids;
-        document.getElementById('statInfluencer').textContent = data.todayInfluencer ? data.todayInfluencer.User.email.split('@')[0] : 'None';
+        const infProfile = data.todayInfluencer;
+        let infName = 'None';
+        if (infProfile) {
+            const emailPrefix = infProfile.User.email.split('@')[0];
+            infName = (infProfile.first_name || infProfile.last_name) ? `${infProfile.first_name || ''} ${infProfile.last_name || ''}`.trim() : emailPrefix;
+        }
+        document.getElementById('statInfluencer').textContent = infName;
         document.getElementById('statTopCert').textContent = data.mostPopularCertification ? data.mostPopularCertification.title : 'None';
         document.getElementById('statTopRole').textContent = data.mostPopularRole ? data.mostPopularRole.job_title : 'None';
         
@@ -273,12 +279,18 @@
             const certs = al.Profile.Certifications.length;
             const joined = new Date(al.createdAt).toLocaleDateString();
             
+            const emailPrefix = al.email.split('@')[0];
+            const fullName = (al.Profile.first_name || al.Profile.last_name) ? `${al.Profile.first_name || ''} ${al.Profile.last_name || ''}`.trim() : emailPrefix;
+            
             return `
                 <tr>
                     <td class="ps-4">
                         <div class="d-flex align-items-center">
-                            <img src="https://ui-avatars.com/api/?name=${al.email}&background=random" class="rounded-circle me-2" width="32">
-                            <span>${al.email}</span>
+                            <img src="https://ui-avatars.com/api/?name=${fullName}&background=random" class="rounded-circle me-3 border" width="40" height="40">
+                            <div>
+                                <div class="fw-bold">${fullName}</div>
+                                <div class="text-muted small">${al.email}</div>
+                            </div>
                         </div>
                     </td>
                     <td><span class="badge bg-light text-dark border">${certs} Certificates</span></td>

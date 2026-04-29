@@ -5,7 +5,7 @@ const { Op } = require("sequelize");
 // Returns overview stats: total alumni, active bids, today's influencer, top cert, top role
 const getOverview = async (req, res) => {
     try {
-        const totalAlumni = await User.count({ where: { is_verified: true } });
+        const totalAlumni = await User.count({ where: { is_verified: true, role: 'alumni' } });
         const totalActiveBids = await Bid.count({ where: { status: "pending" } });
 
         const todayInfluencer = await Profile.findOne({
@@ -504,7 +504,7 @@ const getAlumniList = async (req, res) => {
         }
 
         const { count, rows } = await User.findAndCountAll({
-            where: { is_verified: true },
+            where: { is_verified: true, role: 'alumni' },
             include: [{
                 model: Profile,
                 include: [

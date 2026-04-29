@@ -1,0 +1,209 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Browse Alumni</h2>
+    <a href="/sponsor-dashboard" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="row" id="alumniGrid">
+    <div class="col-12 text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2 text-muted">Loading alumni profiles...</p>
+    </div>
+</div>
+
+<!-- Make Offer Modal -->
+<div class="modal fade" id="offerModal" tabindex="-1" aria-labelledby="offerModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" id="offerModalLabel">Make Sponsorship Offer</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-3">
+                <div class="alert alert-info mb-4">
+                    <small>You are making an offer to sponsor <strong id="modalAlumniName"></strong> for their <strong id="modalCredentialName"></strong>.</small>
+                </div>
+                
+                <form id="offerForm">
+                    <input type="hidden" id="modalProfileId">
+                    <input type="hidden" id="modalCredentialType"> <!-- 'certification' or 'licence' -->
+                    <input type="hidden" id="modalCredentialId">
+                    
+                    <div class="mb-3">
+                        <label for="offerAmount" class="form-label fw-medium">Offer Amount (£)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">£</span>
+                            <input type="number" class="form-control border-start-0 ps-0" id="offerAmount" min="1" step="0.01" required placeholder="0.00">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="offerMessage" class="form-label fw-medium">Message (Optional)</label>
+                        <textarea class="form-control" id="offerMessage" rows="3" placeholder="Add a personal note to the alumni..."></textarea>
+                    </div>
+                    
+                    <div id="offerError" class="alert alert-danger d-none small"></div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2" id="submitOfferBtn">
+                        <span class="spinner-border spinner-border-sm d-none me-2" id="offerSpinner"></span>
+                        Send Offer
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let offerModalInstance;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    offerModalInstance = new bootstrap.Modal(document.getElementById('offerModal'));
+    await loadAlumni();
+});
+
+async function loadAlumni() {
+    const grid = document.getElementById('alumniGrid');
+    try {
+        const res = await fetch('/api/sponsor/alumni');
+        if (!res.ok) throw new Error('Failed to load alumni');
+        
+        const alumni = await res.json();
+        grid.innerHTML = '';
+        
+        if (alumni.length === 0) {
+            grid.innerHTML = '<div class="col-12 text-center text-muted py-5">No alumni with credentials found.</div>';
+            return;
+        }
+        
+        alumni.forEach(person => {
+            const certs = person.Certifications || [];
+            const licences = person.Licences || [];
+            
+            if (certs.length === 0 && licences.length === 0) return; // Skip if no credentials to sponsor
+            
+            const card = document.createElement('div');
+            card.className = 'col-md-4 col-lg-3 mb-4';
+            
+            let credentialsHtml = '';
+            
+            certs.forEach(cert => {
+                credentialsHtml += `
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded border">
+                        <div>
+                            <span class="badge bg-primary mb-1">Certification</span>
+                            <div class="small fw-bold text-truncate" style="max-width: 150px;" title="${cert.title}">${cert.title}</div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="openOfferModal(${person.id}, '${person.first_name} ${person.last_name}', 'certification', ${cert.id}, '${cert.title}')">Offer</button>
+                    </div>
+                `;
+            });
+            
+            licences.forEach(lic => {
+                credentialsHtml += `
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded border">
+                        <div>
+                            <span class="badge bg-info text-dark mb-1">Licence</span>
+                            <div class="small fw-bold text-truncate" style="max-width: 150px;" title="${lic.title}">${lic.title}</div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-info" onclick="openOfferModal(${person.id}, '${person.first_name} ${person.last_name}', 'licence', ${lic.id}, '${lic.title}')">Offer</button>
+                    </div>
+                `;
+            });
+            
+            card.innerHTML = `
+                <div class="card shadow-sm h-100 border-0">
+                    <div class="card-body text-center pb-2">
+                        <img src="${person.profile_image_path || '/images/default-avatar.png'}" class="rounded-circle mb-3 object-fit-cover shadow-sm" width="80" height="80" alt="Profile" onerror="this.src='/images/default-avatar.png'">
+                        <h5 class="card-title fw-bold text-truncate">${person.first_name} ${person.last_name}</h5>
+                        <p class="text-muted small mb-3 text-truncate">${person.biography || 'No bio provided'}</p>
+                    </div>
+                    <div class="card-footer bg-white border-top-0 pt-0 px-3 pb-3">
+                        <hr class="mt-0 mb-3 text-muted opacity-25">
+                        <div class="credentials-list">
+                            ${credentialsHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+        
+    } catch (err) {
+        console.error(err);
+        grid.innerHTML = '<div class="col-12 text-center text-danger py-5"><i class="bi bi-exclamation-triangle"></i> Failed to load alumni list.</div>';
+    }
+}
+
+function openOfferModal(profileId, alumniName, type, credId, credName) {
+    document.getElementById('modalProfileId').value = profileId;
+    document.getElementById('modalAlumniName').textContent = alumniName;
+    document.getElementById('modalCredentialType').value = type;
+    document.getElementById('modalCredentialId').value = credId;
+    document.getElementById('modalCredentialName').textContent = credName;
+    
+    document.getElementById('offerAmount').value = '';
+    document.getElementById('offerMessage').value = '';
+    document.getElementById('offerError').classList.add('d-none');
+    
+    offerModalInstance.show();
+}
+
+document.getElementById('offerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const btn = document.getElementById('submitOfferBtn');
+    const spinner = document.getElementById('offerSpinner');
+    const errorDiv = document.getElementById('offerError');
+    
+    const profileId = document.getElementById('modalProfileId').value;
+    const credType = document.getElementById('modalCredentialType').value;
+    const credId = document.getElementById('modalCredentialId').value;
+    const amount = document.getElementById('offerAmount').value;
+    const message = document.getElementById('offerMessage').value;
+    
+    const payload = {
+        ProfileId: parseInt(profileId),
+        offer_amount: parseFloat(amount),
+        message: message
+    };
+    
+    if (credType === 'certification') payload.CertificationId = parseInt(credId);
+    if (credType === 'licence') payload.LicenceId = parseInt(credId);
+    
+    btn.disabled = true;
+    spinner.classList.remove('d-none');
+    errorDiv.classList.add('d-none');
+    
+    try {
+        const tokenRes = await fetch('/api/auth/csrf-token');
+        const tokenData = await tokenRes.json();
+        
+        const res = await fetch('/api/sponsor/offer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': tokenData.csrfToken
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+            offerModalInstance.hide();
+            showToast('Offer sent successfully!', 'success');
+        } else {
+            errorDiv.textContent = data.error || data.message || 'Failed to send offer.';
+            errorDiv.classList.remove('d-none');
+        }
+    } catch (err) {
+        errorDiv.textContent = 'A network error occurred.';
+        errorDiv.classList.remove('d-none');
+    } finally {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+    }
+});
+</script>

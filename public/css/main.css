@@ -19,7 +19,7 @@ body {
     color: var(--accent) !important;
 }
 
-.nav-link {
+.navbar .nav-link {
     color: rgba(255,255,255,0.85) !important;
     transition: color 0.3s ease;
 }
@@ -80,6 +80,15 @@ body {
 }
 
 /* Dashboard Layout Fixes */
+
+/* When a dashboard page is loaded, remove container padding so sidebar sits flush-left */
+.dashboard-wrapper {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
 .dashboard-sidebar {
     top: 0;
     height: 100vh;
@@ -88,10 +97,21 @@ body {
     z-index: 1000;
     background-color: var(--primary) !important;
     overflow-y: auto;
+    overflow-x: hidden;
+    min-width: 0;           /* let flexbox shrink it properly */
+}
+
+/* Prevent the brand text from overflowing the sidebar */
+.dashboard-sidebar .brand-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;       /* fits inside col-xl-2 */
 }
 
 .dashboard-main {
     padding: 30px;
+    min-width: 0;           /* prevent content from pushing sidebar */
 }
 
 @media (max-width: 768px) {
