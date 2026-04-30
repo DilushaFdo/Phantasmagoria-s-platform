@@ -13,7 +13,7 @@ const Certification = sequelize.define("Certification", {
     },
     url: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
     },
     completion_date: {
         type: DataTypes.DATE,

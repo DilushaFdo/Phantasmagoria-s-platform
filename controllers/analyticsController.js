@@ -2,10 +2,40 @@ const { User, Profile, Degree, Certification, Licence, ProfessionalCourse, Emplo
 const sequelize = require("../db");
 const { Op } = require("sequelize");
 
-// Returns overview stats: total alumni, active bids, today's influencer, top cert, top role
+// get basic stats for the dashboard home page
 const getOverview = async (req, res) => {
     try {
-        const totalAlumni = await User.count({ where: { is_verified: true, role: 'alumni' } });
+        const { programme, yearFrom, yearTo } = req.query;
+        
+        const alumniWhere = { is_verified: true, role: 'alumni' };
+        const alumniInclude = [];
+
+        if (programme || yearFrom || yearTo) {
+            const degreeWhere = {};
+            if (programme) degreeWhere.title = programme;
+            if (yearFrom || yearTo) {
+                const yearRange = {};
+                if (yearFrom) yearRange[Op.gte] = new Date(`${yearFrom}-01-01`);
+                if (yearTo) yearRange[Op.lte] = new Date(`${yearTo}-12-31`);
+                degreeWhere.completion_date = yearRange;
+            }
+
+            alumniInclude.push({
+                model: Profile,
+                required: true,
+                include: [{
+                    model: Degree,
+                    required: true,
+                    where: degreeWhere
+                }]
+            });
+        }
+
+        const totalAlumni = await User.count({ 
+            where: alumniWhere,
+            include: alumniInclude
+        });
+
         const totalActiveBids = await Bid.count({ where: { status: "pending" } });
 
         const todayInfluencer = await Profile.findOne({
@@ -16,10 +46,15 @@ const getOverview = async (req, res) => {
         const mostPopularCertification = await Certification.findAll({
             attributes: [
                 "title",
-                [sequelize.fn("COUNT", sequelize.col("id")), "count"]
+                [sequelize.fn("COUNT", sequelize.col("Certification.id")), "count"]
             ],
-            group: ["title"],
-            order: [[sequelize.fn("COUNT", sequelize.col("id")), "DESC"]],
+            include: alumniInclude.length > 0 ? [{
+                model: Profile,
+                required: true,
+                include: alumniInclude[0].include
+            }] : [],
+            group: ["Certification.title"],
+            order: [[sequelize.fn("COUNT", sequelize.col("Certification.id")), "DESC"]],
             limit: 1,
             raw: true
         });
@@ -29,6 +64,11 @@ const getOverview = async (req, res) => {
                 "job_title",
                 [sequelize.fn("COUNT", sequelize.col("id")), "count"]
             ],
+            include: alumniInclude.length > 0 ? [{
+                model: Profile,
+                required: true,
+                include: alumniInclude[0].include
+            }] : [],
             group: ["job_title"],
             order: [[sequelize.fn("COUNT", sequelize.col("id")), "DESC"]],
             limit: 1,
@@ -36,53 +76,60 @@ const getOverview = async (req, res) => {
         });
 
         return res.status(200).json({
-            totalAlumni,
-            totalActiveBids,
-            todayInfluencer,
-            mostPopularCertification: mostPopularCertification[0] || null,
-            mostPopularRole: mostPopularRole[0] || null
+            success: true,
+            data: {
+                totalAlumni,
+                totalActiveBids,
+                todayInfluencer,
+                mostPopularCertification: mostPopularCertification[0] || null,
+                mostPopularRole: mostPopularRole[0] || null
+            }
         });
     } catch (error) {
         console.error("Error fetching overview:", error);
-        return res.status(500).json({ error: "Failed to fetch overview data" });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch overview data" });
     }
 };
 
-// Returns certification stats: most popular and trends over time (supports programme/graduationYear filters)
+// get stats for certifications like popular ones and trends
 const getCertificationStats = async (req, res) => {
     try {
-        const { graduationYear, programme } = req.query;
+        const { yearFrom, yearTo, programme } = req.query;
 
         const profileInclude = [];
-        if (programme) {
+        const degreeWhere = {};
+        if (programme) degreeWhere.title = programme;
+        
+        if (yearFrom || yearTo) {
+            const yearRange = {};
+            if (yearFrom) yearRange[Op.gte] = new Date(`${yearFrom}-01-01`);
+            if (yearTo) yearRange[Op.lte] = new Date(`${yearTo}-12-31`);
+            degreeWhere.completion_date = yearRange;
+        }
+
+        if (programme || yearFrom || yearTo) {
             profileInclude.push({
                 model: Profile,
                 attributes: [],
+                required: true,
                 include: [{
                     model: Degree,
                     attributes: [],
-                    where: { title: programme }
+                    required: true,
+                    where: degreeWhere
                 }]
             });
         }
 
-        const whereClause = {};
-        if (graduationYear) {
-            whereClause[Op.and] = [
-                sequelize.where(sequelize.fn("YEAR", sequelize.col("Certification.completion_date")), graduationYear)
-            ];
-        }
-
-        const totalCertifications = await Certification.count({ where: whereClause, include: profileInclude });
+        const totalCertifications = await Certification.count({ include: profileInclude });
 
         const mostPopular = await Certification.findAll({
             attributes: [
                 "title",
                 [sequelize.fn("COUNT", sequelize.col("Certification.id")), "count"]
             ],
-            where: whereClause,
             include: profileInclude,
-            group: ["title"],
+            group: ["Certification.title"],
             order: [[sequelize.fn("COUNT", sequelize.col("Certification.id")), "DESC"]],
             limit: 10,
             raw: true,
@@ -103,14 +150,13 @@ const getCertificationStats = async (req, res) => {
                 [sequelize.fn("COUNT", sequelize.col("Certification.id")), "count"]
             ],
             where: {
-                ...whereClause,
                 completion_date: { [Op.ne]: null }
             },
             include: profileInclude,
             group: [
                 sequelize.fn("YEAR", sequelize.col("Certification.completion_date")),
                 sequelize.fn("MONTH", sequelize.col("Certification.completion_date")),
-                "title"
+                "Certification.title"
             ],
             order: [
                 [sequelize.fn("YEAR", sequelize.col("Certification.completion_date")), "ASC"],
@@ -121,50 +167,57 @@ const getCertificationStats = async (req, res) => {
         });
 
         return res.status(200).json({
-            mostPopular: mostPopularWithPercentage || [],
-            trendsOverTime: trendsOverTime || []
+            success: true,
+            data: {
+                mostPopular: mostPopularWithPercentage || [],
+                trendsOverTime: trendsOverTime || []
+            }
         });
     } catch (error) {
         console.error("Error fetching certification stats:", error);
-        return res.status(500).json({ error: "Failed to fetch certification analytics" });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch certification analytics" });
     }
 };
 
-// Returns course stats: most popular and trends over time (supports programme/graduationYear filters)
+// get stats for professional courses
 const getCourseStats = async (req, res) => {
     try {
-        const { graduationYear, programme } = req.query;
+        const { yearFrom, yearTo, programme } = req.query;
 
         const profileInclude = [];
-        if (programme) {
+        const degreeWhere = {};
+        if (programme) degreeWhere.title = programme;
+        
+        if (yearFrom || yearTo) {
+            const yearRange = {};
+            if (yearFrom) yearRange[Op.gte] = new Date(`${yearFrom}-01-01`);
+            if (yearTo) yearRange[Op.lte] = new Date(`${yearTo}-12-31`);
+            degreeWhere.completion_date = yearRange;
+        }
+
+        if (programme || yearFrom || yearTo) {
             profileInclude.push({
                 model: Profile,
                 attributes: [],
+                required: true,
                 include: [{
                     model: Degree,
                     attributes: [],
-                    where: { title: programme }
+                    required: true,
+                    where: degreeWhere
                 }]
             });
         }
 
-        const whereClause = {};
-        if (graduationYear) {
-            whereClause[Op.and] = [
-                sequelize.where(sequelize.fn("YEAR", sequelize.col("ProfessionalCourse.completion_date")), graduationYear)
-            ];
-        }
-
-        const totalCourses = await ProfessionalCourse.count({ where: whereClause, include: profileInclude });
+        const totalCourses = await ProfessionalCourse.count({ include: profileInclude });
 
         const mostPopular = await ProfessionalCourse.findAll({
             attributes: [
                 "title",
                 [sequelize.fn("COUNT", sequelize.col("ProfessionalCourse.id")), "count"]
             ],
-            where: whereClause,
             include: profileInclude,
-            group: ["title"],
+            group: ["ProfessionalCourse.title"],
             order: [[sequelize.fn("COUNT", sequelize.col("ProfessionalCourse.id")), "DESC"]],
             limit: 10,
             raw: true,
@@ -185,14 +238,13 @@ const getCourseStats = async (req, res) => {
                 [sequelize.fn("COUNT", sequelize.col("ProfessionalCourse.id")), "count"]
             ],
             where: {
-                ...whereClause,
                 completion_date: { [Op.ne]: null }
             },
             include: profileInclude,
             group: [
                 sequelize.fn("YEAR", sequelize.col("ProfessionalCourse.completion_date")),
                 sequelize.fn("MONTH", sequelize.col("ProfessionalCourse.completion_date")),
-                "title"
+                "ProfessionalCourse.title"
             ],
             order: [
                 [sequelize.fn("YEAR", sequelize.col("ProfessionalCourse.completion_date")), "ASC"],
@@ -203,38 +255,46 @@ const getCourseStats = async (req, res) => {
         });
 
         return res.status(200).json({
-            mostPopular: mostPopularWithPercentage || [],
-            trendsOverTime: trendsOverTime || []
+            success: true,
+            data: {
+                mostPopular: mostPopularWithPercentage || [],
+                trendsOverTime: trendsOverTime || []
+            }
         });
     } catch (error) {
         console.error("Error fetching course stats:", error);
-        return res.status(500).json({ error: "Failed to fetch course analytics" });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch course analytics" });
     }
 };
 
-// Returns employment stats: top roles, top employers, employment trends (supports filters)
+// get stats for employment like top companies and roles
 const getEmploymentStats = async (req, res) => {
     try {
-        const { graduationYear, programme } = req.query;
+        const { yearFrom, yearTo, programme } = req.query;
 
         const profileInclude = [];
-        if (programme) {
+        const degreeWhere = {};
+        if (programme) degreeWhere.title = programme;
+        
+        if (yearFrom || yearTo) {
+            const yearRange = {};
+            if (yearFrom) yearRange[Op.gte] = new Date(`${yearFrom}-01-01`);
+            if (yearTo) yearRange[Op.lte] = new Date(`${yearTo}-12-31`);
+            degreeWhere.completion_date = yearRange;
+        }
+
+        if (programme || yearFrom || yearTo) {
             profileInclude.push({
                 model: Profile,
                 attributes: [],
+                required: true,
                 include: [{
                     model: Degree,
                     attributes: [],
-                    where: { title: programme }
+                    required: true,
+                    where: degreeWhere
                 }]
             });
-        }
-
-        const whereClause = {};
-        if (graduationYear) {
-            whereClause[Op.and] = [
-                sequelize.where(sequelize.fn("YEAR", sequelize.col("EmploymentHistory.start_date")), graduationYear)
-            ];
         }
 
         const topRoles = await EmploymentHistory.findAll({
@@ -242,7 +302,6 @@ const getEmploymentStats = async (req, res) => {
                 "job_title",
                 [sequelize.fn("COUNT", sequelize.col("EmploymentHistory.id")), "count"]
             ],
-            where: whereClause,
             include: profileInclude,
             group: ["job_title"],
             order: [[sequelize.fn("COUNT", sequelize.col("EmploymentHistory.id")), "DESC"]],
@@ -256,7 +315,6 @@ const getEmploymentStats = async (req, res) => {
                 "company",
                 [sequelize.fn("COUNT", sequelize.col("EmploymentHistory.id")), "count"]
             ],
-            where: whereClause,
             include: profileInclude,
             group: ["company"],
             order: [[sequelize.fn("COUNT", sequelize.col("EmploymentHistory.id")), "DESC"]],
@@ -272,7 +330,6 @@ const getEmploymentStats = async (req, res) => {
                 [sequelize.fn("COUNT", sequelize.col("EmploymentHistory.id")), "count"]
             ],
             where: {
-                ...whereClause,
                 start_date: { [Op.ne]: null }
             },
             include: profileInclude,
@@ -288,17 +345,20 @@ const getEmploymentStats = async (req, res) => {
         });
 
         return res.status(200).json({
-            topRoles: topRoles || [],
-            topEmployers: topEmployers || [],
-            employmentTrends: employmentTrends || []
+            success: true,
+            data: {
+                topRoles: topRoles || [],
+                topEmployers: topEmployers || [],
+                employmentTrends: employmentTrends || []
+            }
         });
     } catch (error) {
         console.error("Error fetching employment stats:", error);
-        return res.status(500).json({ error: "Failed to fetch employment analytics" });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch employment analytics" });
     }
 };
 
-// Returns degree stats: counts by programme, graduations per year
+// get stats for degrees distributionar
 const getDegreeStats = async (req, res) => {
     try {
         const byProgramme = await Degree.findAll({
@@ -323,50 +383,57 @@ const getDegreeStats = async (req, res) => {
         });
 
         return res.status(200).json({
-            byProgramme: byProgramme || [],
-            graduationsByYear: graduationsByYear || []
+            success: true,
+            data: {
+                byProgramme: byProgramme || [],
+                graduationsByYear: graduationsByYear || []
+            }
         });
     } catch (error) {
         console.error("Error fetching degree stats:", error);
-        return res.status(500).json({ error: "Failed to fetch degree analytics" });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch degree analytics" });
     }
 };
 
-// Returns licence stats: most popular and trends over time (supports filters)
+// get stats for professional licences
 const getLicenceStats = async (req, res) => {
     try {
-        const { graduationYear, programme } = req.query;
+        const { yearFrom, yearTo, programme } = req.query;
 
         const profileInclude = [];
-        if (programme) {
+        const degreeWhere = {};
+        if (programme) degreeWhere.title = programme;
+        
+        if (yearFrom || yearTo) {
+            const yearRange = {};
+            if (yearFrom) yearRange[Op.gte] = new Date(`${yearFrom}-01-01`);
+            if (yearTo) yearRange[Op.lte] = new Date(`${yearTo}-12-31`);
+            degreeWhere.completion_date = yearRange;
+        }
+
+        if (programme || yearFrom || yearTo) {
             profileInclude.push({
                 model: Profile,
                 attributes: [],
+                required: true,
                 include: [{
                     model: Degree,
                     attributes: [],
-                    where: { title: programme }
+                    required: true,
+                    where: degreeWhere
                 }]
             });
         }
 
-        const whereClause = {};
-        if (graduationYear) {
-            whereClause[Op.and] = [
-                sequelize.where(sequelize.fn("YEAR", sequelize.col("Licence.completion_date")), graduationYear)
-            ];
-        }
-
-        const totalLicences = await Licence.count({ where: whereClause, include: profileInclude });
+        const totalLicences = await Licence.count({ include: profileInclude });
 
         const mostPopular = await Licence.findAll({
             attributes: [
                 "title",
                 [sequelize.fn("COUNT", sequelize.col("Licence.id")), "count"]
             ],
-            where: whereClause,
             include: profileInclude,
-            group: ["title"],
+            group: ["Licence.title"],
             order: [[sequelize.fn("COUNT", sequelize.col("Licence.id")), "DESC"]],
             limit: 10,
             raw: true,
@@ -387,14 +454,13 @@ const getLicenceStats = async (req, res) => {
                 [sequelize.fn("COUNT", sequelize.col("Licence.id")), "count"]
             ],
             where: {
-                ...whereClause,
                 completion_date: { [Op.ne]: null }
             },
             include: profileInclude,
             group: [
                 sequelize.fn("YEAR", sequelize.col("Licence.completion_date")),
                 sequelize.fn("MONTH", sequelize.col("Licence.completion_date")),
-                "title"
+                "Licence.title"
             ],
             order: [
                 [sequelize.fn("YEAR", sequelize.col("Licence.completion_date")), "ASC"],
@@ -405,16 +471,19 @@ const getLicenceStats = async (req, res) => {
         });
 
         return res.status(200).json({
-            mostPopular: mostPopularWithPercentage || [],
-            trendsOverTime: trendsOverTime || []
+            success: true,
+            data: {
+                mostPopular: mostPopularWithPercentage || [],
+                trendsOverTime: trendsOverTime || []
+            }
         });
     } catch (error) {
         console.error("Error fetching licence stats:", error);
-        return res.status(500).json({ error: "Failed to fetch licence analytics" });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch licence analytics" });
     }
 };
 
-// Returns bidding stats: daily bids, top bidders, average bid by month
+// get bidding stats for the charts bid by month
 const getBiddingStats = async (req, res) => {
     try {
         const dailyBids = await Bid.findAll({
@@ -466,36 +535,41 @@ const getBiddingStats = async (req, res) => {
         });
 
         return res.status(200).json({
-            dailyBids: dailyBids || [],
-            topBidders: topBidders || [],
-            averageBidByMonth: averageBidByMonth || []
+            success: true,
+            data: {
+                dailyBids: dailyBids || [],
+                topBidders: topBidders || [],
+                averageBidByMonth: averageBidByMonth || []
+            }
         });
     } catch (error) {
         console.error("Error fetching bidding stats:", error);
-        return res.status(500).json({ error: "Failed to fetch bidding history" });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch bidding history" });
     }
 };
 
 // Returns paginated alumni list with sub-models, supports filters (programme, graduationYear, company)
 const getAlumniList = async (req, res) => {
     try {
-        const { programme, graduationYear, company, page, limit: queryLimit } = req.query;
+        const { programme, yearFrom, yearTo, graduationYear, company, page, limit: queryLimit } = req.query;
 
         const limit = parseInt(queryLimit) || 20;
         const currentPage = parseInt(page) || 1;
         const offset = (currentPage - 1) * limit;
 
-        const degreeInclude = { model: Degree };
-        if (programme) {
-            degreeInclude.where = { title: programme };
+        const degreeInclude = { model: Degree, required: !!(programme || yearFrom || yearTo) };
+        const degreeWhere = {};
+        if (programme) degreeWhere.title = programme;
+        
+        if (yearFrom || yearTo) {
+            const yearRange = {};
+            if (yearFrom) yearRange[Op.gte] = new Date(`${yearFrom}-01-01`);
+            if (yearTo) yearRange[Op.lte] = new Date(`${yearTo}-12-31`);
+            degreeWhere.completion_date = yearRange;
         }
-        if (graduationYear) {
-            degreeInclude.where = {
-                ...degreeInclude.where,
-                [Op.and]: [
-                    sequelize.where(sequelize.fn("YEAR", sequelize.col("Degrees.completion_date")), graduationYear)
-                ]
-            };
+        
+        if (Object.keys(degreeWhere).length > 0) {
+            degreeInclude.where = degreeWhere;
         }
 
         const employmentInclude = { model: EmploymentHistory };
@@ -507,29 +581,33 @@ const getAlumniList = async (req, res) => {
             where: { is_verified: true, role: 'alumni' },
             include: [{
                 model: Profile,
+                required: false, // Ensure we show alumni even if they haven't set up a profile yet
                 include: [
-                    degreeInclude,
-                    { model: Certification },
-                    { model: Licence },
-                    { model: ProfessionalCourse },
-                    employmentInclude
+                    { ...degreeInclude, required: !!(programme || graduationYear) },
+                    { model: Certification, required: false },
+                    { model: Licence, required: false },
+                    { model: ProfessionalCourse, required: false },
+                    { ...employmentInclude, required: !!company }
                 ]
             }],
             limit,
             offset,
-            distinct: true,
-            subQuery: false
+            distinct: true
+            // Removed subQuery: false to fix pagination truncation
         });
 
         return res.status(200).json({
-            alumni: rows || [],
-            total: count || 0,
-            page: currentPage,
-            totalPages: Math.ceil((count || 0) / limit)
+            success: true,
+            data: {
+                alumni: rows || [],
+                total: count || 0,
+                page: currentPage,
+                totalPages: Math.ceil((count || 0) / limit)
+            }
         });
     } catch (error) {
         console.error("Error fetching alumni list:", error);
-        return res.status(500).json({ error: "Failed to fetch alumni list" });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch alumni list" });
     }
 };
 

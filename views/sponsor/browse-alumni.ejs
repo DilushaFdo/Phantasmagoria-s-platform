@@ -61,19 +61,29 @@ let offerModalInstance;
 document.addEventListener('DOMContentLoaded', async () => {
     offerModalInstance = new bootstrap.Modal(document.getElementById('offerModal'));
     await loadAlumni();
+
+    // Event delegation for dynamically generated "Make Offer" buttons (CSP compliance)
+    document.getElementById('alumniGrid').addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-make-offer');
+        if (btn) {
+            const { profileId, alumniName, type, credId, credName } = btn.dataset;
+            openOfferModal(profileId, alumniName, type, credId, credName);
+        }
+    });
 });
 
 async function loadAlumni() {
     const grid = document.getElementById('alumniGrid');
     try {
-        const res = await fetch('/api/sponsor/alumni');
+        const res = await fetch('/api/sponsorship/alumni');
         if (!res.ok) throw new Error('Failed to load alumni');
         
-        const alumni = await res.json();
+        const json = await res.json();
+        const alumni = json.data || json;
         grid.innerHTML = '';
         
         if (alumni.length === 0) {
-            grid.innerHTML = '<div class="col-12 text-center text-muted py-5">No alumni with credentials found.</div>';
+            grid.innerHTML = '<div class="col-12 text-center text-muted py-5">No alumni found.</div>';
             return;
         }
         
@@ -81,43 +91,68 @@ async function loadAlumni() {
             const certs = person.Certifications || [];
             const licences = person.Licences || [];
             
-            if (certs.length === 0 && licences.length === 0) return; // Skip if no credentials to sponsor
-            
             const card = document.createElement('div');
             card.className = 'col-md-4 col-lg-3 mb-4';
             
             let credentialsHtml = '';
             
-            certs.forEach(cert => {
-                credentialsHtml += `
-                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded border">
-                        <div>
-                            <span class="badge bg-primary mb-1">Certification</span>
-                            <div class="small fw-bold text-truncate" style="max-width: 150px;" title="${cert.title}">${cert.title}</div>
+            if (certs.length === 0 && licences.length === 0) {
+                credentialsHtml = '<p class="text-muted small fst-italic text-center my-3">No certifications or licences to sponsor</p>';
+            } else {
+                certs.forEach(cert => {
+                    const date = cert.completion_date ? new Date(cert.completion_date).toLocaleDateString() : 'N/A';
+                    credentialsHtml += `
+                        <div class="mb-3 p-3 bg-light rounded border">
+                            <div class="mb-2">
+                                <span class="badge bg-primary mb-1">Certification</span>
+                                <div class="fw-bold small text-truncate" title="${cert.title}">${cert.title}</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">Completed: ${date}</div>
+                            </div>
+                            ${cert.hasOffer ? 
+                                `<span class="badge bg-success w-100 py-2 shadow-sm"><i class="bi bi-check-circle me-1"></i> Offer Sent</span>` : 
+                                `<button class="btn btn-sm btn-primary w-100 fw-bold shadow-sm btn-make-offer" 
+                                    data-profile-id="${person.id}" 
+                                    data-alumni-name="${person.first_name} ${person.last_name}" 
+                                    data-type="certification" 
+                                    data-cred-id="${cert.id}" 
+                                    data-cred-name="${cert.title}">Make Offer</button>`
+                            }
                         </div>
-                        <button class="btn btn-sm btn-outline-primary" onclick="openOfferModal(${person.id}, '${person.first_name} ${person.last_name}', 'certification', ${cert.id}, '${cert.title}')">Offer</button>
-                    </div>
-                `;
-            });
-            
-            licences.forEach(lic => {
-                credentialsHtml += `
-                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded border">
-                        <div>
-                            <span class="badge bg-info text-dark mb-1">Licence</span>
-                            <div class="small fw-bold text-truncate" style="max-width: 150px;" title="${lic.title}">${lic.title}</div>
+                    `;
+                });
+                
+                licences.forEach(lic => {
+                    let issuingBody = 'Unknown';
+                    try {
+                        issuingBody = new URL(lic.url).hostname.replace('www.', '');
+                    } catch(e) {}
+                    
+                    credentialsHtml += `
+                        <div class="mb-3 p-3 bg-light rounded border">
+                            <div class="mb-2">
+                                <span class="badge bg-info text-dark mb-1">Licence</span>
+                                <div class="fw-bold small text-truncate" title="${lic.title}">${lic.title}</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">Issued by: ${issuingBody}</div>
+                            </div>
+                            ${lic.hasOffer ? 
+                                `<span class="badge bg-success w-100 py-2 shadow-sm"><i class="bi bi-check-circle me-1"></i> Offer Sent</span>` : 
+                                `<button class="btn btn-sm btn-info w-100 fw-bold shadow-sm btn-make-offer" 
+                                    data-profile-id="${person.id}" 
+                                    data-alumni-name="${person.first_name} ${person.last_name}" 
+                                    data-type="licence" 
+                                    data-cred-id="${lic.id}" 
+                                    data-cred-name="${lic.title}">Make Offer</button>`
+                            }
                         </div>
-                        <button class="btn btn-sm btn-outline-info" onclick="openOfferModal(${person.id}, '${person.first_name} ${person.last_name}', 'licence', ${lic.id}, '${lic.title}')">Offer</button>
-                    </div>
-                `;
-            });
+                    `;
+                });
+            }
             
             card.innerHTML = `
                 <div class="card shadow-sm h-100 border-0">
                     <div class="card-body text-center pb-2">
                         <img src="${person.profile_image_path || '/images/default-avatar.png'}" class="rounded-circle mb-3 object-fit-cover shadow-sm" width="80" height="80" alt="Profile" onerror="this.src='/images/default-avatar.png'">
                         <h5 class="card-title fw-bold text-truncate">${person.first_name} ${person.last_name}</h5>
-                        <p class="text-muted small mb-3 text-truncate">${person.biography || 'No bio provided'}</p>
                     </div>
                     <div class="card-footer bg-white border-top-0 pt-0 px-3 pb-3">
                         <hr class="mt-0 mb-3 text-muted opacity-25">
@@ -177,14 +212,15 @@ document.getElementById('offerForm').addEventListener('submit', async (e) => {
     errorDiv.classList.add('d-none');
     
     try {
-        const tokenRes = await fetch('/api/auth/csrf-token');
-        const tokenData = await tokenRes.json();
-        
-        const res = await fetch('/api/sponsor/offer', {
+        const csrfToken = await getCsrfToken();
+        if (!csrfToken) throw new Error("Failed to secure the session. Please refresh.");
+
+        const res = await fetch('/api/sponsorship/offer', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': tokenData.csrfToken
+                'X-CSRF-TOKEN': csrfToken
             },
             body: JSON.stringify(payload)
         });
@@ -194,6 +230,8 @@ document.getElementById('offerForm').addEventListener('submit', async (e) => {
         if (res.ok) {
             offerModalInstance.hide();
             showToast('Offer sent successfully!', 'success');
+            // Refresh the list to show the new "Offer Sent" badge
+            await loadAlumni();
         } else {
             errorDiv.textContent = data.error || data.message || 'Failed to send offer.';
             errorDiv.classList.remove('d-none');

@@ -16,7 +16,7 @@
                         <div class="card border-0 shadow-sm mb-4">
                             <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
                                 <h6 class="fw-bold mb-0">Market Dominance by Role</h6>
-                                <button class="btn btn-sm btn-link text-decoration-none" onclick="downloadChart('rolesBarChart', 'job_roles.png')">
+                                <button class="btn btn-sm btn-link text-decoration-none btn-download-chart" data-chart="rolesBarChart" data-filename="job_roles.png">
                                     <i class="bi bi-download"></i> PNG
                                 </button>
                             </div>
@@ -33,7 +33,7 @@
                         <div class="card border-0 shadow-sm h-100">
                             <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
                                 <h6 class="fw-bold mb-0">Role Comparison Across Degree Programmes</h6>
-                                <button class="btn btn-sm btn-link text-decoration-none" onclick="downloadChart('groupedBarChart', 'role_comparison.png')">
+                                <button class="btn btn-sm btn-link text-decoration-none btn-download-chart" data-chart="groupedBarChart" data-filename="role_comparison.png">
                                     <i class="bi bi-download"></i> PNG
                                 </button>
                             </div>
@@ -80,6 +80,15 @@
     document.addEventListener('DOMContentLoaded', () => {
         initFilters(loadData);
         loadData({});
+
+        // Handle downloads without inline onclick (CSP compliance)
+        document.querySelectorAll('.btn-download-chart').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const chartId = btn.dataset.chart;
+                const filename = btn.dataset.filename;
+                downloadChart(chartId, filename);
+            });
+        });
     });
 
     async function loadData(filters) {
@@ -91,17 +100,19 @@
         try {
             const query = new URLSearchParams(filters).toString();
             const [empRes, alumniRes] = await Promise.all([
-                fetch(`/api/analytics/employment?${query}`, { headers: getAuthHeaders() }),
-                fetch(`/api/analytics/alumni?limit=100`, { headers: getAuthHeaders() })
+                fetch(`/api/analytics/employment?${query}`, { headers: getAuthHeaders(), credentials: 'include' }),
+                fetch(`/api/analytics/alumni?limit=100`, { headers: getAuthHeaders(), credentials: 'include' })
             ]);
 
-            const empData = await empRes.json();
-            const alumniData = await alumniRes.json();
+            const empJson = await empRes.json();
+            const alumniJson = await alumniRes.json();
+            const empData = empJson.data || empJson;
+            const alumniData = alumniJson.data || alumniJson;
 
-            drawJobTitlesChart('rolesBarChart', empData.topRoles);
-            drawRolesByProgrammeChart('groupedBarChart', alumniData.alumni);
+            drawJobTitlesChart('rolesBarChart', empData.topRoles || []);
+            drawRolesByProgrammeChart('groupedBarChart', alumniData.alumni || []);
 
-            document.getElementById('statTopRoleValue').textContent = empData.topRoles[0]?.job_title || 'None';
+            document.getElementById('statTopRoleValue').textContent = empData.topRoles?.[0]?.job_title || 'None';
 
         } catch (err) {
             console.error(err);

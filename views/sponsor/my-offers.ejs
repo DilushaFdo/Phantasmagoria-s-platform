@@ -67,11 +67,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadOffers() {
     try {
-        const res = await fetch('/api/sponsor/dashboard-data');
-        if (!res.ok) throw new Error('Failed to load offers');
-        
-        const data = await res.json();
-        // Assuming dashboard-data returns recentOffers which contains all offers for the sponsor
+        const data = await apiGet('/api/sponsorship/dashboard-data');
+        // apiGet already unwraps the { success: true, data: { ... } } envelope
         allOffers = data.recentOffers || [];
         renderTable();
     } catch (err) {

@@ -17,7 +17,9 @@ const generateKey = async (req, res) => {
             const isValid = scopes.every(s => ALLOWED_SCOPES.includes(s));
             if (!isValid) {
                 return res.status(400).json({ 
-                    error: `Invalid scope(s) provided. Allowed: ${ALLOWED_SCOPES.join(", ")}` 
+                    success: false,
+                    error: 'INVALID_SCOPE',
+                    message: `Invalid scope(s) provided. Allowed: ${ALLOWED_SCOPES.join(", ")}` 
                 });
             }
             finalScopes = scopes.join(",");
@@ -38,16 +40,19 @@ const generateKey = async (req, res) => {
         });
 
         res.status(201).json({
+            success: true,
             message: "API key generated successfully. IMPORTANT: This is the ONLY time you will see this key. Store it securely.",
-            id: newKey.id,
-            raw_key: rawKey,
-            scopes: newKey.scopes,
-            status: newKey.status,
-            name: newKey.name
+            data: {
+                id: newKey.id,
+                raw_key: rawKey,
+                scopes: newKey.scopes,
+                status: newKey.status,
+                name: newKey.name
+            }
         });
     } catch (error) {
         console.error("Error generating API key:", error);
-        res.status(500).json({ error: "Failed to generate API key" });
+        res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to generate API key" });
     }
 };
 
@@ -74,10 +79,10 @@ const listKeys = async (req, res) => {
             };
         }));
 
-        res.status(200).json({ keys: keysWithUsage });
+        res.status(200).json({ success: true, data: { keys: keysWithUsage } });
     } catch (error) {
         console.error("Error listing API keys:", error);
-        res.status(500).json({ error: "Failed to list API keys" });
+        res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to list API keys" });
     }
 };
 
@@ -94,16 +99,16 @@ const revokeKey = async (req, res) => {
         });
 
         if (!key) {
-            return res.status(404).json({ error: "API key not found" });
+            return res.status(404).json({ success: false, error: 'NOT_FOUND', message: "API key not found" });
         }
 
         key.status = "revoked";
         await key.save();
 
-        res.status(200).json({ message: "API key revoked successfully", key });
+        res.status(200).json({ success: true, message: "API key revoked successfully", data: { key } });
     } catch (error) {
         console.error("Error revoking API key:", error);
-        res.status(500).json({ error: "Failed to revoke API key" });
+        res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to revoke API key" });
     }
 };
 
@@ -118,7 +123,7 @@ const getUsageStats = async (req, res) => {
         const keyIds = keys.map(k => k.id);
 
         if (keyIds.length === 0) {
-            return res.status(200).json({ usageLogs: [] });
+            return res.status(200).json({ success: true, data: { usageLogs: [] } });
         }
 
         const logs = await ApiUsageLog.findAll({
@@ -127,13 +132,16 @@ const getUsageStats = async (req, res) => {
         });
 
         res.status(200).json({
-            total_keys: keys.length,
-            total_requests: logs.length,
-            usageLogs: logs,
+            success: true,
+            data: {
+                total_keys: keys.length,
+                total_requests: logs.length,
+                usageLogs: logs,
+            }
         });
     } catch (error) {
         console.error("Error fetching usage statistics:", error);
-        res.status(500).json({ error: "Failed to fetch usage statistics" });
+        res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch usage statistics" });
     }
 };
 
@@ -178,23 +186,26 @@ const getDashboardSummary = async (req, res) => {
         }
 
         return res.status(200).json({
-            login_statistics: {
-                total_logins: totalLogins,
-                recent_logins: recentLogins,
-            },
-            api_key_overview: {
-                total_keys: keys.length,
-                active_keys: activeKeys,
-                revoked_keys: revokedKeys,
-            },
-            api_usage: {
-                total_api_hits: totalApiHits,
-                top_endpoints: endpointBreakdown,
-            },
+            success: true,
+            data: {
+                login_statistics: {
+                    total_logins: totalLogins,
+                    recent_logins: recentLogins,
+                },
+                api_key_overview: {
+                    total_keys: keys.length,
+                    active_keys: activeKeys,
+                    revoked_keys: revokedKeys,
+                },
+                api_usage: {
+                    total_api_hits: totalApiHits,
+                    top_endpoints: endpointBreakdown,
+                },
+            }
         });
     } catch (error) {
         console.error("Error fetching dashboard summary:", error);
-        return res.status(500).json({ error: "Failed to fetch dashboard summary" });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch dashboard summary" });
     }
 };
 

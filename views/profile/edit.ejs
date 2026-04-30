@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Generate Credential Accordion Sections
     const container = document.getElementById('credentialSectionsContainer');
     credConfigs.forEach(conf => {
-        container.innerHTML += `
+        container.insertAdjacentHTML('beforeend', `
             <div class="accordion-item border-0 shadow-sm mb-3 rounded">
                 <h2 class="accordion-header" id="heading_${conf.id}">
                     <button class="accordion-button collapsed fw-bold rounded" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_${conf.id}" style="color: var(--primary);">
@@ -242,7 +242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div id="list-${conf.id}"></div>
                         <hr class="my-4">
                         <h6 class="mb-3 fw-bold">Add ${conf.label}</h6>
-                        <form id="form-${conf.id}" onsubmit="handleAddCred(event, '${conf.endpoint}')">
+                        <form id="form-${conf.id}">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Title</label>
@@ -260,17 +260,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-accent" id="btn-${conf.id}">
-                                <span class="spinner-border spinner-border-sm d-none me-1" id="spin-${conf.id}"></span> Add
+                                Add
                             </button>
                         </form>
                     </div>
                 </div>
             </div>
-        `;
+        `);
     });
 
-    // Initialize Bootstrap components
-    editModalInstance = new bootstrap.Modal(document.getElementById('editModal'));
+    // Attach Credential Form Listeners
+    credConfigs.forEach(conf => {
+        const form = document.getElementById(`form-${conf.id}`);
+        if (form) {
+            form.addEventListener('submit', (e) => handleAddCred(e, conf.endpoint));
+        }
+    });
+
     // Initialize Bootstrap components
     editModalInstance = new bootstrap.Modal(document.getElementById('editModal'));
 
@@ -281,9 +287,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     try {
-        const tokenRes = await fetch('/api/auth/csrf-token');
-        const tokenData = await tokenRes.json();
-        globalCsrf = tokenData.csrfToken;
+        const csrfToken = await getCsrfToken();
+        globalCsrf = csrfToken;
 
         await loadProfileData();
 
@@ -306,6 +311,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('modalEmpEnd').disabled = this.checked;
         if(this.checked) document.getElementById('modalEmpEnd').value = '';
     });
+
+    // --- EVENT DELEGATION FOR EDIT/DELETE BUTTONS ---
+    document.getElementById('editContent').addEventListener('click', function(e) {
+        const editBtn = e.target.closest('.btn-edit-item');
+        const deleteBtn = e.target.closest('.btn-delete-item');
+
+        if (editBtn) {
+            const type = editBtn.dataset.type;
+            const endpoint = editBtn.dataset.endpoint;
+            const itemJson = editBtn.dataset.item;
+            openEditModal(type, endpoint, itemJson);
+        } else if (deleteBtn) {
+            const endpoint = deleteBtn.dataset.endpoint;
+            const id = deleteBtn.dataset.id;
+            deleteItem(endpoint, id);
+        }
+    });
 });
 
 async function apiCall(url, method, bodyObj, btnId) {
@@ -313,12 +335,14 @@ async function apiCall(url, method, bodyObj, btnId) {
     if(btn) setBtnLoading(btn, true);
     
     try {
+        const csrfToken = await getCsrfToken();
         const res = await fetch(url, {
             method: method,
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': globalCsrf
+                'X-CSRF-TOKEN': csrfToken
             },
+            credentials: 'include',
             body: bodyObj ? JSON.stringify(bodyObj) : undefined
         });
         const data = await res.json();
@@ -331,15 +355,16 @@ async function apiCall(url, method, bodyObj, btnId) {
 
 async function loadProfileData() {
     try {
-        const res = await fetch('/api/profile');
-        let data = {};
+        const res = await fetch('/api/profile', { credentials: 'include' });
+        let json = {};
         
         if (res.status === 404 || res.status === 204) {
-            data = { Degrees: [], Certifications: [], Licences: [], ProfessionalCourses: [], EmploymentHistories: [] };
+            json = { data: { Degrees: [], Certifications: [], Licences: [], ProfessionalCourses: [], EmploymentHistories: [] } };
         } else {
-            data = await res.json();
+            json = await res.json();
         }
         
+        const data = json.data || json;
         currentProfileData = data;
         
         // Populate Basic Info
@@ -355,7 +380,7 @@ async function loadProfileData() {
         } else {
             document.getElementById('profile_image_path').value = '';
             const name = data.User?.email?.split('@')[0] || 'Alumni';
-            document.getElementById('currentImagePreview').src = `https://ui-avatars.com/api/?name=${name}&background=1e3a5f&color=fff`;
+            document.getElementById('currentImagePreview').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1e3a5f&color=fff`;
         }
 
         // Populate Credentials Lists
@@ -439,8 +464,8 @@ function renderCredList(typeId, items, endpoint) {
                     ${item.completion_date ? `<small class="text-muted">Completed: ${formatDateShort(item.completion_date)}</small>` : ''}
                 </div>
                 <div>
-                    <button class="btn btn-sm btn-light me-1" onclick="openEditModal('cred', '${endpoint}', '${itemJson}')"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteItem('${endpoint}', ${item.id})"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-sm btn-light me-1 btn-edit-item" data-type="cred" data-endpoint="${endpoint}" data-item="${itemJson}"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger btn-delete-item" data-endpoint="${endpoint}" data-id="${item.id}"><i class="bi bi-trash"></i></button>
                 </div>
             </li>
         `;
@@ -485,8 +510,8 @@ function renderEmpList(items) {
                     <small class="text-muted">${item.company} | ${s} to ${e}</small>
                 </div>
                 <div>
-                    <button class="btn btn-sm btn-light me-1" onclick="openEditModal('emp', '/api/profile/employment', '${itemJson}')"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteItem('/api/profile/employment', ${item.id})"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-sm btn-light me-1 btn-edit-item" data-type="emp" data-endpoint="/api/profile/employment" data-item="${itemJson}"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger btn-delete-item" data-endpoint="/api/profile/employment" data-id="${item.id}"><i class="bi bi-trash"></i></button>
                 </div>
             </li>
         `;
@@ -497,33 +522,62 @@ function renderEmpList(items) {
 
 // ── Shared Modal & Delete Logic ──
 function openEditModal(type, endpoint, itemJsonStr) {
-    const item = JSON.parse(decodeURIComponent(itemJsonStr));
-    document.getElementById('modalEndpoint').value = endpoint;
-    document.getElementById('modalId').value = item.id;
-    document.getElementById('modalType').value = type;
-    
-    if (type === 'cred') {
-        document.getElementById('modalCredFields').classList.remove('d-none');
-        document.getElementById('modalEmpFields').classList.add('d-none');
+    try {
+        const item = JSON.parse(decodeURIComponent(itemJsonStr));
+        document.getElementById('modalEndpoint').value = endpoint;
+        document.getElementById('modalId').value = item.id;
+        document.getElementById('modalType').value = type;
         
-        document.getElementById('modalTitle').value = item.title;
-        document.getElementById('modalUrl').value = item.url || '';
-        document.getElementById('modalDate').value = item.completion_date ? new Date(item.completion_date).toISOString().split('T')[0] : '';
-    } else {
-        document.getElementById('modalCredFields').classList.add('d-none');
-        document.getElementById('modalEmpFields').classList.remove('d-none');
+        if (type === 'cred') {
+            document.getElementById('modalCredFields').classList.remove('d-none');
+            document.getElementById('modalEmpFields').classList.add('d-none');
+            
+            document.getElementById('modalTitle').value = item.title || '';
+            document.getElementById('modalUrl').value = item.url || '';
+            
+            let dateVal = '';
+            if (item.completion_date) {
+                const d = new Date(item.completion_date);
+                if (!isNaN(d.getTime())) {
+                    dateVal = d.toISOString().split('T')[0];
+                }
+            }
+            document.getElementById('modalDate').value = dateVal;
+        } else {
+            document.getElementById('modalCredFields').classList.add('d-none');
+            document.getElementById('modalEmpFields').classList.remove('d-none');
+            
+            document.getElementById('modalEmpTitle').value = item.job_title || '';
+            document.getElementById('modalEmpCompany').value = item.company || '';
+            
+            let startVal = '';
+            if (item.start_date) {
+                const d = new Date(item.start_date);
+                if (!isNaN(d.getTime())) {
+                    startVal = d.toISOString().split('T')[0];
+                }
+            }
+            document.getElementById('modalEmpStart').value = startVal;
+            
+            const isCurrent = !item.end_date;
+            document.getElementById('modalEmpCurrent').checked = isCurrent;
+            document.getElementById('modalEmpEnd').disabled = isCurrent;
+            
+            let endVal = '';
+            if (item.end_date) {
+                const d = new Date(item.end_date);
+                if (!isNaN(d.getTime())) {
+                    endVal = d.toISOString().split('T')[0];
+                }
+            }
+            document.getElementById('modalEmpEnd').value = endVal;
+        }
         
-        document.getElementById('modalEmpTitle').value = item.job_title;
-        document.getElementById('modalEmpCompany').value = item.company;
-        document.getElementById('modalEmpStart').value = item.start_date ? new Date(item.start_date).toISOString().split('T')[0] : '';
-        
-        const isCurrent = !item.end_date;
-        document.getElementById('modalEmpCurrent').checked = isCurrent;
-        document.getElementById('modalEmpEnd').disabled = isCurrent;
-        document.getElementById('modalEmpEnd').value = item.end_date ? new Date(item.end_date).toISOString().split('T')[0] : '';
+        editModalInstance.show();
+    } catch (err) {
+        console.error('Error opening edit modal:', err);
+        showToast('Failed to open edit modal', 'error');
     }
-    
-    editModalInstance.show();
 }
 
 async function handleModalSave() {
@@ -562,4 +616,8 @@ async function deleteItem(endpoint, id) {
         showToast('Deleted successfully!');
     } catch(err) { handleFetchError(err); }
 }
+// Expose functions to global scope for onclick handlers
+window.openEditModal = openEditModal;
+window.deleteItem = deleteItem;
+window.handleModalSave = handleModalSave;
 </script>

@@ -145,9 +145,9 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     errorDiv.classList.add('d-none');
     
     try {
-        const tokenRes = await fetch('/api/auth/csrf-token');
-        const tokenData = await tokenRes.json();
-        const csrfToken = tokenData.csrfToken;
+        // Fetch CSRF token using shared helper
+        const csrfToken = await getCsrfToken();
+        if (!csrfToken) throw new Error("Failed to secure the session. Please refresh.");
 
         const payload = { role, email, password };
         if (role === 'alumni') {
@@ -159,6 +159,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
 
         const res = await fetch('/api/auth/register', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../lib/authMiddleware");
+const roleMiddleware = require("../lib/roleMiddleware");
 const sponsorAuth = require("../lib/sponsorAuth");
 const { logout } = require("../controllers/authController");
 
@@ -27,7 +28,7 @@ router.get("/reset-password", (req, res) => {
 });
 
 // ── Public Alumni Views ──
-router.get("/alumni/today", (req, res) => {
+router.get("/alumni/today", authMiddleware.optional, (req, res) => {
     res.render("alumni/today");
 });
 
@@ -36,19 +37,21 @@ router.get("/profile", authMiddleware, (req, res) => {
     res.render("profile/index");
 });
 
-router.get("/profile/:id", authMiddleware, (req, res) => {
-    res.render("profile/index");
-});
-
 router.get("/profile/edit", authMiddleware, (req, res) => {
     res.render("profile/edit");
+});
+
+router.get("/profile/:id", authMiddleware, (req, res) => {
+    res.render("profile/index");
 });
 
 router.get("/bidding", authMiddleware, (req, res) => {
     res.render("bidding/index");
 });
 
-const roleMiddleware = require("../lib/roleMiddleware");
+router.get("/sponsorship-offers", authMiddleware, roleMiddleware(['alumni']), (req, res) => {
+    res.render("bidding/sponsorship-offers");
+});
 
 router.get("/developer", authMiddleware, roleMiddleware(['developer', 'admin']), (req, res) => {
     res.render("developer/index");

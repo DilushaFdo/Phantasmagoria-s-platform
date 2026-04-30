@@ -13,7 +13,7 @@ const Licence = sequelize.define("Licence", {
     },
     url: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
     },
     completion_date: {
         type: DataTypes.DATE,

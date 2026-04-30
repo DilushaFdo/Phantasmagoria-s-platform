@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const apiTrackingMiddleware = require("../../lib/apiTrackingMiddleware");
+const authMiddleware = require("../../lib/authMiddleware");
 const analyticsController = require("../../controllers/analyticsController");
 
 /**
@@ -52,6 +53,7 @@ const analyticsController = require("../../controllers/analyticsController");
  */
 router.get(
     "/overview", 
+    authMiddleware.optional,
     apiTrackingMiddleware("read:analytics"), 
     analyticsController.getOverview
 );
@@ -107,6 +109,7 @@ router.get(
  */
 router.get(
     "/certifications", 
+    authMiddleware.optional,
     apiTrackingMiddleware("read:analytics"), 
     analyticsController.getCertificationStats
 );
@@ -162,6 +165,7 @@ router.get(
  */
 router.get(
     "/courses", 
+    authMiddleware.optional,
     apiTrackingMiddleware("read:analytics"), 
     analyticsController.getCourseStats
 );
@@ -221,6 +225,7 @@ router.get(
  */
 router.get(
     "/employment", 
+    authMiddleware.optional,
     apiTrackingMiddleware("read:analytics"), 
     analyticsController.getEmploymentStats
 );
@@ -266,6 +271,7 @@ router.get(
  */
 router.get(
     "/degrees", 
+    authMiddleware.optional,
     apiTrackingMiddleware("read:analytics"), 
     analyticsController.getDegreeStats
 );
@@ -321,6 +327,7 @@ router.get(
  */
 router.get(
     "/licences", 
+    authMiddleware.optional,
     apiTrackingMiddleware("read:analytics"), 
     analyticsController.getLicenceStats
 );
@@ -370,6 +377,7 @@ router.get(
  */
 router.get(
     "/bidding", 
+    authMiddleware.optional,
     apiTrackingMiddleware("read:analytics"), 
     analyticsController.getBiddingStats
 );
@@ -447,6 +455,7 @@ router.get(
  */
 router.get(
     "/alumni", 
+    authMiddleware.optional,
     apiTrackingMiddleware("read:alumni"), 
     analyticsController.getAlumniList
 );

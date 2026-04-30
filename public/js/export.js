@@ -1,12 +1,9 @@
-/**
- * Export and Report Generation Logic
- */
+// logic for exporting data to csv and pdf
 
-const getApiKey = () => document.querySelector('meta[name="api-key"]')?.content;
-const getAuthHeaders = () => ({ 'Authorization': `Bearer ${getApiKey()}` });
+// Shared helpers moved to main.js
 
 document.addEventListener('DOMContentLoaded', () => {
-    initFilters((f) => console.log('Filters applied:', f));
+    initFilters();
     loadPresets();
 
     document.getElementById('btnExportCSV').addEventListener('click', exportToCSV);
@@ -14,23 +11,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnSavePreset').addEventListener('click', savePreset);
 });
 
-/**
- * SECTION 1: Export Alumni Data
- */
+// helper function to get alumni data from the api
 async function fetchAllAlumni() {
     const programme = document.getElementById('filterProgramme').value;
     const fromYear = document.getElementById('filterYearFrom').value;
     const toYear = document.getElementById('filterYearTo').value;
 
     const params = new URLSearchParams({
-        limit: 1000, // High limit for export
+        limit: 1000,
         programme,
-        graduationYear: fromYear // Assuming single year for now or backend supports range
+        yearFrom: fromYear,
+        yearTo: toYear
     });
 
-    const res = await fetch(`/api/analytics/alumni?${params}`, { headers: getAuthHeaders() });
-    const data = await res.json();
-    return data.alumni || [];
+    const res = await fetch(`/api/analytics/alumni?${params}`, { headers: getAuthHeaders(), credentials: 'include' });
+    const json = await res.json();
+    const data = json.data || json;
+    return data.alumni || (Array.isArray(data) ? data : []);
 }
 
 async function exportToCSV() {
@@ -39,19 +36,23 @@ async function exportToCSV() {
     try {
         const alumni = await fetchAllAlumni();
         if (alumni.length === 0) {
-            showToast('No data found to export', true);
+            showToast('No data found to export with current filters', 'error');
             return;
         }
 
         let csvContent = "Email,Degree,Graduation Year,Current Role,Employer,Certifications,Licences\n";
 
         alumni.forEach(al => {
-            const degree = al.Profile.Degrees[0]?.title || 'N/A';
-            const year = al.Profile.Degrees[0]?.completion_date ? new Date(al.Profile.Degrees[0].completion_date).getFullYear() : 'N/A';
-            const role = al.Profile.EmploymentHistories[0]?.job_title || 'N/A';
-            const employer = al.Profile.EmploymentHistories[0]?.company || 'N/A';
-            const certs = al.Profile.Certifications.length;
-            const licences = al.Profile.Licences.length;
+            const profile = al.Profile || {};
+            const degrees = profile.Degrees || [];
+            const history = profile.EmploymentHistories || [];
+            
+            const degree = degrees[0]?.title || 'N/A';
+            const year = degrees[0]?.completion_date ? new Date(degrees[0].completion_date).getFullYear() : 'N/A';
+            const role = history[0]?.job_title || 'N/A';
+            const employer = history[0]?.company || 'N/A';
+            const certs = (profile.Certifications || []).length;
+            const licences = (profile.Licences || []).length;
 
             csvContent += `"${al.email}","${degree}","${year}","${role}","${employer}","${certs}","${licences}"\n`;
         });
@@ -77,14 +78,17 @@ async function exportToPDF() {
     try {
         const alumni = await fetchAllAlumni();
         if (alumni.length === 0) {
-            showToast('No data found to export', true);
+            showToast('No data found to export with current filters', 'error');
             return;
         }
 
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            throw new Error('PDF library (jsPDF) failed to load. Please check your internet connection or CSP settings.');
+        }
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
 
-        // Header
+        // add header to pdf
         doc.setFontSize(20);
         doc.text("Alumni Influencers — Data Export", 14, 22);
         doc.setFontSize(11);
@@ -94,20 +98,25 @@ async function exportToPDF() {
         const prog = document.getElementById('filterProgramme').value || 'All';
         doc.text(`Applied Filter: ${prog} Programme`, 14, 36);
 
-        // Summary Stats
+        // add some summary stats to the pdf
         doc.setFontSize(14);
         doc.setTextColor(0);
         doc.text("Summary Stats", 14, 48);
         doc.setFontSize(11);
         doc.text(`Total Alumni: ${alumni.length}`, 14, 56);
         
-        // Table
-        const tableData = alumni.map(al => [
-            al.email,
-            al.Profile.Degrees[0]?.title || 'N/A',
-            al.Profile.EmploymentHistories[0]?.job_title || 'N/A',
-            al.Profile.EmploymentHistories[0]?.company || 'N/A'
-        ]);
+        // create table for the alumni list
+        const tableData = alumni.map(al => {
+            const profile = al.Profile || {};
+            const degrees = profile.Degrees || [];
+            const history = profile.EmploymentHistories || [];
+            return [
+                al.email,
+                degrees[0]?.title || 'N/A',
+                history[0]?.job_title || 'N/A',
+                history[0]?.company || 'N/A'
+            ];
+        });
 
         doc.autoTable({
             startY: 65,
@@ -126,9 +135,7 @@ async function exportToPDF() {
     }
 }
 
-/**
- * SECTION 2: Save Filter Presets
- */
+// functions for managing filter presets
 function savePreset() {
     const nameInput = document.getElementById('presetName');
     const name = nameInput.value;
@@ -201,8 +208,6 @@ function deletePreset(idx) {
     showToast(`Preset "${name}" deleted.`);
 }
 
-/**
- * Exposed globally for HTML onclick
- */
+// make these global so they work with button clicks
 window.applyPreset = applyPreset;
 window.deletePreset = deletePreset;

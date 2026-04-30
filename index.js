@@ -9,7 +9,7 @@ const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const swaggerUi = require("swagger-ui-express");
 const swaggerJsdoc = require("swagger-jsdoc");
-// Connecting to databases and setting up middleware
+// connect to db and setup middleware
 const dbConnection = require("./db");
 const { generateCsrfToken, validateCsrfToken } = require("./lib/csrfMiddleware");
 
@@ -17,26 +17,26 @@ const app = express();
 
 const expressLayouts = require("express-ejs-layouts");
 
-// EJS view engine setup for dashboard pages
+// setup ejs engine for the frontend
 app.use(expressLayouts);
 app.set("layout", "partials/layout");
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-// Default locals
+// some default variables for the pages
 app.locals.path = '';
 app.locals.user = null;
 
-// Serve static files (CSS, JS, images) for the dashboard
+// static files folder
 app.use(express.static(path.join(__dirname, "public")));
 
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
-            fontSrc: ["'self'", "https://cdn.jsdelivr.net", "https://fonts.gstatic.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://cdn.datatables.net"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com", "https://cdn.datatables.net"],
+            fontSrc: ["'self'", "https://cdn.jsdelivr.net", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
             imgSrc: ["'self'", "data:", "https:"],
             connectSrc: ["'self'", "ws:", "http://localhost:*", "ws://localhost:*"]
         }
@@ -52,11 +52,12 @@ app.use(cors({
     credentials: true,
 }));
 
-// Global middleware to pass user data to EJS templates
+// middleware to check user login status and send to templates
 const jwt = require("jsonwebtoken");
 const { User, Profile } = require("./models");
 app.use(async (req, res, next) => {
     res.locals.path = req.path;
+    res.locals.ANALYTICS_API_KEY = process.env.ANALYTICS_API_KEY || '';
     const token = req.cookies.jwt;
     res.locals.user = null;
     if (token) {
@@ -68,7 +69,7 @@ app.use(async (req, res, next) => {
             });
             if (user) {
                 res.locals.user = user.get({ plain: true });
-                // Make name easily accessible
+                // put name in easy place to access
                 res.locals.user.first_name = user.Profile ? user.Profile.first_name : null;
                 res.locals.user.last_name = user.Profile ? user.Profile.last_name : null;
             }
@@ -79,11 +80,11 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Rate limiting so people don't spam the API
+// limit api calls to stop spamming
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
-    message: "Too many requests from this IP, please try again later",
+    max: 500, // Increased for development and dashboard heavy usage
+    message: { success: false, error: 'TOO_MANY_REQUESTS', message: "Too many requests from this IP, please try again later" },
 });
 app.use("/api/", apiLimiter);
 
@@ -96,13 +97,13 @@ const publicApiRoutes = require("./routes/publicApiRoutes");
 const analyticsRoutes = require("./routes/api/analytics");
 const sponsorshipRouter = require("./routes/api/sponsorship");
 const viewsRoutes = require("./routes/views");
-// Running scheduled tasks (like picking the winner)
+// run background tasks (like picking the winner)
 require("./lib/midnightTask");
 
 // CSRF token endpoint for the frontend to call first
 app.get("/api/auth/csrf-token", generateCsrfToken);
 
-// Apply CSRF protection for security on all state-changing requests
+// apply csrf check on api requests for security
 app.use("/api/", validateCsrfToken);
 
 app.use("/api/auth", authRoutes);
@@ -113,10 +114,10 @@ app.use("/api/public", publicApiRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/sponsorship", sponsorshipRouter);
 
-// Frontend web pages (served with EJS)
+// setup the main website pages
 app.use("/", viewsRoutes);
 
-// Setting up Swagger for documentation
+// swagger setup for api docs
 const swaggerOptions = {
     definition: {
         openapi: "3.0.0",
@@ -165,12 +166,12 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 
 
 
-// 404 Handler
+// show 404 page if route not found
 app.use((req, res) => {
     res.status(404).render("404");
 });
 
-// Finally, sync with the DB and start the server!
+// sync db models and start the server
 dbConnection.sync().then(() => {
     app.listen(process.env.PORT, () => {
         console.log(`Server is running on port ${process.env.PORT}`);

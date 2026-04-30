@@ -255,7 +255,15 @@
             <i class="bi bi-calendar-x text-muted mb-4" style="font-size: 5rem;"></i>
             <h2 class="fw-bold mb-3">No featured alumni today</h2>
             <p class="text-muted mb-4">The bidding for today's spot hasn't closed yet. Check back tomorrow!</p>
-            <a href="/" class="btn btn-primary px-4">Visit Platform</a>
+            <% if (locals.user) { %>
+                <% if (user.role === 'sponsor') { %>
+                    <a href="/sponsor-dashboard" class="btn btn-primary px-4">Go to My Dashboard</a>
+                <% } else { %>
+                    <a href="/dashboard" class="btn btn-primary px-4">Go to My Dashboard</a>
+                <% } %>
+            <% } else { %>
+                <a href="/login" class="btn btn-primary px-4">Visit Platform</a>
+            <% } %>
         </div>
     </div>
 
@@ -346,8 +354,13 @@
         <footer class="text-center">
             <div class="container">
                 <h4 class="fw-bold mb-3">Inspired by this journey?</h4>
-                <p class="text-muted mb-4">Join our network of elite alumni and build your legacy today.</p>
-                <a href="/register" class="btn btn-primary px-5 btn-lg">Join Phantasmagoria</a>
+                <% if (locals.user) { %>
+                    <p class="text-muted mb-4">Continue your own professional growth on the platform.</p>
+                    <a href="<%= user.role === 'sponsor' ? '/sponsor-dashboard' : '/dashboard' %>" class="btn btn-primary px-5 btn-lg">Return to Dashboard</a>
+                <% } else { %>
+                    <p class="text-muted mb-4">Join our network of elite alumni and build your legacy today.</p>
+                    <a href="/register" class="btn btn-primary px-5 btn-lg">Join Phantasmagoria</a>
+                <% } %>
             </div>
         </footer>
 
@@ -371,7 +384,8 @@
 
                 if (!res.ok) throw new Error('API request failed');
 
-                const data = await res.json();
+                const json = await res.json();
+                const data = json.data || json;
                 populateData(data);
                 
                 document.getElementById('loader').classList.add('d-none');

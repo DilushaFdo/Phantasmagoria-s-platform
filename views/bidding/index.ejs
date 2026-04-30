@@ -1,7 +1,47 @@
+<!-- SECTION 0: Top Banners -->
+<div class="row mb-3" id="topBannersRow">
+    <div class="col-12">
+        <div id="walletBanner" class="card border-0 shadow-sm d-none mb-3">
+            <div class="card-body p-3 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle p-2 me-3" id="walletIconBg" style="background-color: rgba(0,0,0,0.05);">
+                        <i class="bi bi-wallet2 fs-4" id="walletIcon"></i>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block fw-medium">Wallet Balance</small>
+                        <h4 class="mb-0 fw-bold" id="wallet-balance" data-amount="0.00">£0.00</h4>
+                    </div>
+                </div>
+                <div id="walletStatusMsg" class="text-end small">
+                    <!-- Dynamic status message -->
+                </div>
+            </div>
+        </div>
+
+        <div id="pendingAlert" class="alert alert-warning border-0 shadow-sm d-none mb-0">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <i class="bi bi-megaphone-fill me-2"></i>
+                    You have <strong id="pendingAlertCount">0</strong> pending sponsorship offer(s)! Accept them to increase your bid balance.
+                </div>
+                <a href="/sponsorship-offers" class="btn btn-sm btn-warning fw-bold border-dark border-opacity-25">View Offers →</a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row mb-4 align-items-center">
     <div class="col">
         <h2 class="mb-0" style="color: var(--primary);">Bid Management</h2>
         <p class="text-muted">Manage your blind bids to be featured as "Alumni of the Day"</p>
+    </div>
+    <div class="col-auto">
+        <a href="/sponsorship-offers" class="btn btn-outline-primary position-relative fw-bold">
+            <i class="bi bi-gift me-1"></i> Manage Sponsorships
+            <span id="pendingOffersBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
+                0
+            </span>
+        </a>
     </div>
 </div>
 
@@ -90,7 +130,7 @@
                         <div class="alert alert-warning py-2 small mb-3">
                             <i class="bi bi-eye-slash-fill me-1"></i> <strong>Blind Bidding:</strong> You cannot see other bids. Enter your best amount.
                         </div>
-                        <div class="mb-3 text-success fw-bold small" id="maxBidAmountDisplay">
+                        <div class="mb-3 text-success fw-bold small" id="max-bid-amount">
                             <!-- injected by JS -->
                         </div>
                         <div class="mb-3">
@@ -215,9 +255,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-        const tokenRes = await fetch('/api/auth/csrf-token');
-        const tokenData = await tokenRes.json();
-        globalCsrf = tokenData.csrfToken;
+        const csrfToken = await getCsrfToken();
+        globalCsrf = csrfToken;
 
         await Promise.all([
             loadSponsorships(),
@@ -245,14 +284,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const btn = document.getElementById('btnPlaceBid');
 
         if (amt > totalAvailableSponsorship) {
-            errDiv.textContent = `Bid cannot exceed your sponsorship balance of £${totalAvailableSponsorship.toFixed(2)}`;
+            errDiv.textContent = `Bid cannot exceed your wallet balance of £${totalAvailableSponsorship.toFixed(2)}`;
             errDiv.classList.remove('d-none');
             earnDiv.textContent = '';
             btn.disabled = true;
         } else {
             errDiv.classList.add('d-none');
-            const potential = Math.max(0, totalAvailableSponsorship - amt);
-            earnDiv.textContent = `If you win with this bid, you keep: £${potential.toFixed(2)}`;
+            const earnings = Math.max(0, totalAvailableSponsorship - amt);
+            earnDiv.textContent = `If you win: you keep £${earnings.toFixed(2)}`;
             btn.disabled = false;
         }
     });
@@ -271,6 +310,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btnPrevPage').addEventListener('click', () => changePage(-1));
     document.getElementById('btnNextPage').addEventListener('click', () => changePage(1));
+
+    // --- EVENT DELEGATION FOR SPONSORSHIP OFFERS ---
+    const pendingOffersContainer = document.getElementById('pendingOffersContainer');
+    if (pendingOffersContainer) {
+        pendingOffersContainer.addEventListener('click', function(e) {
+            const respondBtn = e.target.closest('.btn-respond-offer');
+            if (respondBtn) {
+            const id = respondBtn.dataset.id;
+            const action = respondBtn.dataset.action;
+            const amount = respondBtn.dataset.amount;
+            respondToOffer(id, action, amount);
+            }
+        });
+    }
 });
 
 async function apiCall(url, method, bodyObj, btnId) {
@@ -278,15 +331,18 @@ async function apiCall(url, method, bodyObj, btnId) {
     if(btn) setBtnLoading(btn, true);
     
     try {
+        const csrfToken = await getCsrfToken();
         const res = await fetch(url, {
             method: method,
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': globalCsrf
+                'X-CSRF-TOKEN': csrfToken
             },
+            credentials: 'include',
             body: bodyObj ? JSON.stringify(bodyObj) : undefined
         });
-        const data = await res.json();
+        const json = await res.json();
+        const data = json.data || json;
         if(!res.ok) throw new Error(data.error || data.message || 'API Error');
         return data;
     } finally {
@@ -297,23 +353,83 @@ async function apiCall(url, method, bodyObj, btnId) {
 // ── Loaders ──
 async function loadSponsorships() {
     try {
-        const [sumRes, offRes] = await Promise.all([
-            fetch('/api/sponsorship/summary'),
-            fetch('/api/sponsorship/my-offers')
+        const [sumRes, offRes, profRes] = await Promise.all([
+            fetch('/api/sponsorship/summary', { credentials: 'include' }),
+            fetch('/api/sponsorship/my-offers', { credentials: 'include' }),
+            fetch('/api/profile', { credentials: 'include' })
         ]);
         
-        const sumData = await sumRes.json();
-        const offData = await offRes.json();
+        const parseJson = async (res) => {
+            if (!res.ok) {
+                const text = await res.text();
+                let errorData = {};
+                try { errorData = JSON.parse(text); } catch(e) {}
+                throw new Error(errorData.message || errorData.error || `Request failed with status ${res.status}`);
+            }
+            return await res.json();
+        };
 
-        totalAvailableSponsorship = Number(sumData.totalAvailable) || 0;
+        const sumJson = await parseJson(sumRes);
+        const offJson = await parseJson(offRes);
+        const profJson = await parseJson(profRes);
 
+        const sumData = sumJson.data || sumJson;
+        const offData = offJson.data || offJson;
+        const profData = profJson.data || profJson;
+
+        // CHANGE 1: Wallet Balance Banner
+        const walletAmt = parseFloat(profData.wallet_balance) || 0;
+        totalAvailableSponsorship = walletAmt;
+
+        const walletEl = document.getElementById('wallet-balance');
+        const walletBanner = document.getElementById('walletBanner');
+        const walletStatus = document.getElementById('walletStatusMsg');
+        const walletIconBg = document.getElementById('walletIconBg');
+        const walletIcon = document.getElementById('walletIcon');
+
+        walletBanner.classList.remove('d-none');
+        walletEl.textContent = `£${walletAmt.toFixed(2)}`;
+        walletEl.dataset.amount = walletAmt.toString();
+
+        if (walletAmt === 0) {
+            walletBanner.classList.add('border-start', 'border-danger', 'border-4');
+            walletIconBg.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
+            walletIcon.className = 'bi bi-wallet2 fs-4 text-danger';
+            walletStatus.innerHTML = `
+                <span class="text-danger fw-bold d-block">You have no funds yet.</span>
+                <a href="/sponsorship-offers" class="text-decoration-none small fw-bold text-danger">Check sponsorship offers to accept funding →</a>
+            `;
+        } else {
+            walletBanner.classList.add('border-start', 'border-success', 'border-4');
+            walletIconBg.style.backgroundColor = 'rgba(25, 135, 84, 0.1)';
+            walletIcon.className = 'bi bi-wallet2 fs-4 text-success';
+            walletStatus.innerHTML = `<span class="text-success fw-bold">Your wallet is funded and ready for bidding!</span>`;
+        }
+
+        // CHANGE 2: Pending Offers Alert
+        const pendingOffers = offData.offers?.pending || [];
+        const badge = document.getElementById('pendingOffersBadge');
+        const alertBanner = document.getElementById('pendingAlert');
+        const alertCount = document.getElementById('pendingAlertCount');
+
+        if (pendingOffers.length > 0) {
+            badge.textContent = pendingOffers.length;
+            badge.classList.remove('d-none');
+            alertCount.textContent = pendingOffers.length;
+            alertBanner.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+            alertBanner.classList.add('d-none');
+        }
+
+        // Section summary UI
         const sumContainer = document.getElementById('sponsorshipSummaryContainer');
         if (totalAvailableSponsorship === 0) {
             sumContainer.innerHTML = `
                 <div class="card border-warning shadow-sm">
                     <div class="card-body bg-warning bg-opacity-10 text-dark p-4">
-                        <h5 class="fw-bold"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i> You cannot place a bid yet.</h5>
-                        <p class="mb-0">You need sponsorship offers from certification or course providers before you can bid. Your certifications and licences are visible to potential sponsors on the platform.</p>
+                        <h5 class="fw-bold"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i> No Bidding Funds Available</h5>
+                        <p class="mb-0">You need to accept sponsorship offers before you can place bids. Your certifications and licences are visible to potential sponsors in the alumni directory.</p>
                     </div>
                 </div>
             `;
@@ -324,26 +440,24 @@ async function loadSponsorships() {
             sumContainer.innerHTML = `
                 <div class="card border-primary shadow-sm">
                     <div class="card-body p-4">
-                        <h5 class="fw-bold text-primary"><i class="bi bi-wallet2 me-2"></i> Your Sponsorship Balance</h5>
+                        <h5 class="fw-bold text-primary"><i class="bi bi-wallet2 me-2"></i> Bidding Balance Breakdown</h5>
                         <h3 class="fw-bold mb-3">Total available: £${totalAvailableSponsorship.toFixed(2)}</h3>
-                        <p class="text-muted small mb-2">This is your maximum bid amount.</p>
                         <ul class="mb-0 small">${listHtml}</ul>
                     </div>
                 </div>
             `;
-            document.getElementById('maxBidAmountDisplay').textContent = `Maximum bid: £${totalAvailableSponsorship.toFixed(2)}`;
+            document.getElementById('max-bid-amount').textContent = `Maximum bid: £${totalAvailableSponsorship.toFixed(2)}`;
             document.getElementById('placeBidAmount').max = totalAvailableSponsorship;
             document.getElementById('placeBidAmount').disabled = false;
+            document.getElementById('btnPlaceBid').disabled = false;
         }
 
-        const pendingOffers = offData.offers?.pending || [];
         const pendingContainer = document.getElementById('pendingOffersContainer');
-        
         if (pendingOffers.length > 0) {
             let html = `
                 <div class="card shadow-sm border-0 mt-2">
                     <div class="card-header bg-white py-3">
-                        <h5 class="mb-0 fw-bold">Pending Sponsorship Offers</h5>
+                        <h5 class="mb-0 fw-bold">Review Your Offers</h5>
                     </div>
                     <ul class="list-group list-group-flush">
             `;
@@ -353,13 +467,13 @@ async function loadSponsorships() {
                 html += `
                     <li class="list-group-item p-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
                         <div>
-                            <div class="fw-bold">${o.Sponsor?.company_name || 'Unknown Sponsor'}</div>
+                            <div class="fw-bold">${o.Sponsor?.company_name || 'Sponsor'}</div>
                             <div class="small text-muted">Offered for: ${title}</div>
                             <div class="fw-bold text-success mt-1">£${Number(o.offer_amount).toFixed(2)}</div>
                         </div>
                         <div>
-                            <button class="btn btn-sm btn-success me-1 px-3" onclick="respondToOffer(${o.id}, 'accept')"><i class="bi bi-check-circle"></i> Accept</button>
-                            <button class="btn btn-sm btn-danger px-3" onclick="respondToOffer(${o.id}, 'reject')"><i class="bi bi-x-circle"></i> Reject</button>
+                            <button class="btn btn-sm btn-success me-1 px-3 btn-respond-offer" data-id="${o.id}" data-action="accept" data-amount="${o.offer_amount}"><i class="bi bi-check-circle"></i> Accept</button>
+                            <button class="btn btn-sm btn-danger px-3 btn-respond-offer" data-id="${o.id}" data-action="reject" data-amount="0"><i class="bi bi-x-circle"></i> Reject</button>
                         </div>
                     </li>
                 `;
@@ -376,39 +490,46 @@ async function loadSponsorships() {
     }
 }
 
-window.respondToOffer = async function(sponsorshipId, action) {
+async function respondToOffer(sponsorshipId, action) {
     try {
-        const res = await fetch('/api/sponsorship/respond', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': globalCsrf
-            },
-            body: JSON.stringify({ sponsorshipId, action })
-        });
-        
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Action failed');
+        const data = await apiCall(`/api/sponsorship/respond/${sponsorshipId}`, 'POST', { action });
         
         if (action === 'accept') {
-            showToast(`Offer accepted! £${Number(data.sponsorship.offer_amount).toFixed(2)} added to your balance.`);
+            const offerAmt = parseFloat(amount || 0);
+            showToast(`Offer accepted! £${offerAmt.toFixed(2)} added to your balance.`);
+            
+            // Immediate UI update
+            const walletEl = document.getElementById('wallet-balance');
+            const currentBal = parseFloat(walletEl.dataset.amount || 0);
+            const newBal = currentBal + offerAmt;
+            
+            walletEl.textContent = '£' + newBal.toFixed(2);
+            walletEl.dataset.amount = newBal.toString();
+            
+            const maxBidDisplay = document.getElementById('max-bid-amount');
+            if (maxBidDisplay) {
+                maxBidDisplay.textContent = 'Maximum bid: £' + newBal.toFixed(2);
+            }
+            
+            totalAvailableSponsorship = newBal;
         } else {
             showToast('Offer rejected.');
         }
         
-        await Promise.all([
-            loadSponsorships(),
-            loadTomorrowBid()
-        ]);
+        // Still refresh to sync other UI elements (badge, lists)
+        await loadSponsorships();
+        await loadTomorrowBid();
     } catch (err) {
         showToast(err.message, "error");
     }
-};
+}
+window.respondToOffer = respondToOffer;
 
 async function loadTomorrowBid() {
     try {
-        const tRes = await fetch('/api/bids/tomorrow');
-        const tData = await tRes.json();
+        const tRes = await fetch('/api/bids/tomorrow', { credentials: 'include' });
+        const tJson = await tRes.json();
+        const tData = tJson.data || tJson;
 
         const activeState = document.getElementById('activeBidState');
         const noState = document.getElementById('noBidState');
@@ -418,11 +539,12 @@ async function loadTomorrowBid() {
             document.getElementById('activeBidAmount').textContent = `£${currentBidAmount.toFixed(2)}`;
             
             // Fetch Status
-            const sRes = await fetch(`/api/bids/status?target_date=${tomorrowStr}`);
+            const sRes = await fetch(`/api/bids/status?target_date=${tomorrowStr}`, { credentials: 'include' });
             const badgeContainer = document.getElementById('activeBidBadgeContainer');
             
             if (sRes.ok) {
-                const sData = await sRes.json();
+                const sJson = await sRes.json();
+                const sData = sJson.data || sJson;
                 if (sData.status === 'winning') {
                     badgeContainer.innerHTML = `<span class="badge bg-success px-4 py-2" style="font-size: 1rem;"><i class="bi bi-trophy-fill me-1"></i> WINNING</span>`;
                 } else {
@@ -444,8 +566,9 @@ async function loadTomorrowBid() {
 
 async function loadMonthlyLimit() {
     try {
-        const res = await fetch('/api/bids/monthly-status');
-        const data = await res.json();
+        const res = await fetch('/api/bids/monthly-status', { credentials: 'include' });
+        const json = await res.json();
+        const data = json.data || json;
 
         const container = document.getElementById('slotsVisualContainer');
         const textDisplay = document.getElementById('slotsTextDisplay');
@@ -488,8 +611,9 @@ async function loadMonthlyLimit() {
 
 async function loadHistory() {
     try {
-        const res = await fetch('/api/bids/my-bids');
-        const data = await res.json();
+        const res = await fetch('/api/bids/my-bids', { credentials: 'include' });
+        const json = await res.json();
+        const data = json.data || json;
         allBids = data.bids || [];
         currentPage = 1;
         renderHistoryTable();
@@ -543,9 +667,11 @@ async function handleCancelBid() {
         const btn = document.getElementById('btnCancelBid');
         setBtnLoading(btn, true);
         
+        const csrfToken = await getCsrfToken();
         const res = await fetch(`/api/bids/delete?target_date=${tomorrowStr}`, {
             method: 'DELETE',
-            headers: { 'X-CSRF-TOKEN': globalCsrf }
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            credentials: 'include'
         });
         const data = await res.json();
         setBtnLoading(btn, false);
@@ -616,4 +742,7 @@ function updatePaginationUI() {
     document.getElementById('btnPrevPage').disabled = currentPage <= 1;
     document.getElementById('btnNextPage').disabled = currentPage >= maxPage;
 }
+
+// Global helpers (showToast, setBtnLoading, handleFetchError) are provided by main.js
+
 </script>

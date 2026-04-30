@@ -11,7 +11,7 @@ const {
     getProfile,
     getProfileImage, updateProfileImage, deleteProfileImage
 } = require('../controllers/profileController');
-const { profileBaseValidation, degreeValidation } = require('../lib/validation');
+const { profileBaseValidation, degreeValidation, credentialValidation } = require('../lib/validation');
 
 /**
  * @swagger
@@ -156,7 +156,7 @@ router.delete('/degree/:id', authMiddleware, deleteDegree);
  *     responses:
  *       201: { description: Added }
  */
-router.post('/certification', authMiddleware, addCertification);
+router.post('/certification', authMiddleware, credentialValidation, addCertification);
 
 /**
  * @swagger
@@ -184,7 +184,7 @@ router.post('/certification', authMiddleware, addCertification);
  *     responses:
  *       200: { description: Deleted }
  */
-router.put('/certification/:id', authMiddleware, updateCertification);
+router.put('/certification/:id', authMiddleware, credentialValidation, updateCertification);
 router.delete('/certification/:id', authMiddleware, deleteCertification);
 
 /**
@@ -196,7 +196,7 @@ router.delete('/certification/:id', authMiddleware, deleteCertification);
  *     security: [ { bearerAuth: [], csrfToken: [] } ]
  *     responses: { 201: { description: Added } }
  */
-router.post('/licence', authMiddleware, addLicence);
+router.post('/licence', authMiddleware, credentialValidation, addLicence);
 
 /**
  * @swagger
@@ -214,7 +214,7 @@ router.post('/licence', authMiddleware, addLicence);
  *     security: [ { bearerAuth: [], csrfToken: [] } ]
  *     responses: { 200: { description: Deleted } }
  */
-router.put('/licence/:id', authMiddleware, updateLicence);
+router.put('/licence/:id', authMiddleware, credentialValidation, updateLicence);
 router.delete('/licence/:id', authMiddleware, deleteLicence);
 
 /**
@@ -226,7 +226,7 @@ router.delete('/licence/:id', authMiddleware, deleteLicence);
  *     security: [ { bearerAuth: [], csrfToken: [] } ]
  *     responses: { 201: { description: Added } }
  */
-router.post('/course', authMiddleware, addProfessionalCourse);
+router.post('/course', authMiddleware, credentialValidation, addProfessionalCourse);
 
 /**
  * @swagger
@@ -244,7 +244,7 @@ router.post('/course', authMiddleware, addProfessionalCourse);
  *     security: [ { bearerAuth: [], csrfToken: [] } ]
  *     responses: { 200: { description: Deleted } }
  */
-router.put('/course/:id', authMiddleware, updateProfessionalCourse);
+router.put('/course/:id', authMiddleware, credentialValidation, updateProfessionalCourse);
 router.delete('/course/:id', authMiddleware, deleteProfessionalCourse);
 
 /**

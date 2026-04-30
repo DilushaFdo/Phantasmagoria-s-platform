@@ -1,16 +1,11 @@
-/**
- * Shared Chart Logic for Phantasmagoria Dashboard
- */
+// logic for drawing charts using chart.js
 
-const getApiKey = () => document.querySelector('meta[name="api-key"]')?.content;
-const getAuthHeaders = () => ({ 'Authorization': `Bearer ${getApiKey()}` });
+// Shared helpers moved to main.js
 
 // Global store for chart instances to allow destruction/refresh
-const chartInstances = {};
+window.chartInstances = {};
 
-/**
- * Initialize Filters
- */
+// function to setup the filter dropdowns and buttons
 async function initFilters(onApply) {
     const programmeSelect = document.getElementById('filterProgramme');
     const fromYearSelect = document.getElementById('filterYearFrom');
@@ -18,10 +13,11 @@ async function initFilters(onApply) {
     const btnApply = document.getElementById('btnApplyFilters');
     const btnReset = document.getElementById('btnResetFilters');
 
-    // Populate Programmes
+    // get programmes from api to fill the dropdown
     try {
-        const res = await fetch('/api/analytics/degrees', { headers: getAuthHeaders() });
-        const data = await res.json();
+        const res = await fetch('/api/analytics/degrees', { headers: getAuthHeaders(), credentials: 'include' });
+        const json = await res.json();
+        const data = json.data || json;
         if (data.byProgramme) {
             data.byProgramme.forEach(p => {
                 const opt = document.createElement('option');
@@ -34,7 +30,7 @@ async function initFilters(onApply) {
         console.error('Failed to load programmes', err);
     }
 
-    // Populate Years (2010 to current + 5)
+    // fill years dropdown (2010 to now + 1)
     const currentYear = new Date().getFullYear();
     for (let y = 2010; y <= currentYear + 1; y++) {
         const opt1 = document.createElement('option');
@@ -65,21 +61,20 @@ async function initFilters(onApply) {
     });
 }
 
-/**
- * Download Chart as PNG
- */
+// function to save chart as a png file
 function downloadChart(chartId, filename = 'chart.png') {
-    const chart = chartInstances[chartId];
-    if (!chart) return;
+    const chart = window.chartInstances[chartId];
+    if (!chart) {
+        console.warn(`Chart instance for ${chartId} not found.`);
+        return;
+    }
     const link = document.createElement('a');
     link.download = filename;
     link.href = chart.toBase64Image();
     link.click();
 }
 
-/**
- * Radar Chart: Skills vs Certs
- */
+// draw radar chart for skills and certs
 function drawRadarChart(canvasId, certs, courses) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     
@@ -88,14 +83,19 @@ function drawRadarChart(canvasId, certs, courses) {
     const topCourses = courses.slice(0, 8);
     
     // Create unique labels from both
-    const labels = [...new Set([...topCerts.map(c => c.title), ...topCourses.map(c => c.title)])].slice(0, 10);
+    let labels = [...new Set([...topCerts.map(c => c.title), ...topCourses.map(c => c.title)])].slice(0, 10);
+    
+    // Ensure at least 3 axes to maintain radar shape
+    while (labels.length < 3) {
+        labels.push(`Axis ${labels.length + 1}`);
+    }
     
     const certData = labels.map(l => certs.find(c => c.title === l)?.count || 0);
     const courseData = labels.map(l => courses.find(c => c.title === l)?.count || 0);
 
-    if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    if (window.chartInstances[canvasId]) window.chartInstances[canvasId].destroy();
 
-    chartInstances[canvasId] = new Chart(ctx, {
+    window.chartInstances[canvasId] = new Chart(ctx, {
         type: 'radar',
         data: {
             labels,
@@ -124,9 +124,7 @@ function drawRadarChart(canvasId, certs, courses) {
     });
 }
 
-/**
- * Horizontal Bar Chart with Color Coding (Gap Analysis)
- */
+// draw bar chart for gap analysis (with colors)
 function drawGapAnalysisChart(canvasId, data, totalAlumni) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     const top10 = data.slice(0, 10);
@@ -141,9 +139,9 @@ function drawGapAnalysisChart(canvasId, data, totalAlumni) {
         return '#2ecc71'; // Green (Emerging)
     });
 
-    if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    if (window.chartInstances[canvasId]) window.chartInstances[canvasId].destroy();
 
-    chartInstances[canvasId] = new Chart(ctx, {
+    window.chartInstances[canvasId] = new Chart(ctx, {
         type: 'bar',
         data: {
             labels,
@@ -171,9 +169,7 @@ function drawGapAnalysisChart(canvasId, data, totalAlumni) {
     });
 }
 
-/**
- * Doughnut Chart: Top Employers
- */
+// draw doughnut chart for top employers
 function drawEmployerDoughnut(canvasId, employers) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     const top8 = employers.slice(0, 8);
@@ -187,9 +183,9 @@ function drawEmployerDoughnut(canvasId, employers) {
         data.push(otherCount);
     }
 
-    if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    if (window.chartInstances[canvasId]) window.chartInstances[canvasId].destroy();
 
-    chartInstances[canvasId] = new Chart(ctx, {
+    window.chartInstances[canvasId] = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels,
@@ -206,9 +202,7 @@ function drawEmployerDoughnut(canvasId, employers) {
     });
 }
 
-/**
- * Line Chart: Trends
- */
+// draw line chart for job trends over time
 function drawTrendLineChart(canvasId, trends) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     const years = [...new Set(trends.map(t => t.year))].sort();
@@ -225,9 +219,9 @@ function drawTrendLineChart(canvasId, trends) {
         };
     });
 
-    if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    if (window.chartInstances[canvasId]) window.chartInstances[canvasId].destroy();
 
-    chartInstances[canvasId] = new Chart(ctx, {
+    window.chartInstances[canvasId] = new Chart(ctx, {
         type: 'line',
         data: { labels: years, datasets },
         options: {
@@ -238,16 +232,14 @@ function drawTrendLineChart(canvasId, trends) {
     });
 }
 
-/**
- * Job Titles Bar Chart (Gradient)
- */
+// draw bar chart for job titles
 function drawJobTitlesChart(canvasId, roles) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     const top10 = roles.slice(0, 10);
 
-    if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    if (window.chartInstances[canvasId]) window.chartInstances[canvasId].destroy();
 
-    chartInstances[canvasId] = new Chart(ctx, {
+    window.chartInstances[canvasId] = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: top10.map(r => r.job_title),
@@ -267,15 +259,13 @@ function drawJobTitlesChart(canvasId, roles) {
     });
 }
 
-/**
- * Grouped Bar Chart: Roles vs Programme
- */
+// draw grouped bar chart for roles by degree programme
 function drawRolesByProgrammeChart(canvasId, alumniData) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     
     // This requires processing the full alumni list client-side
     // We group by Programme and then by Role
-    const programmes = [...new Set(alumniData.map(al => al.Profile.Degrees[0]?.title))].filter(Boolean);
+    const programmes = [...new Set(alumniData.map(al => al.Profile?.Degrees?.[0]?.title))].filter(Boolean);
     const topRoles = ['Software Engineer', 'Data Scientist', 'Project Manager', 'DevOps Engineer', 'Full Stack Developer'];
     
     const datasets = topRoles.map((role, idx) => {
@@ -283,15 +273,15 @@ function drawRolesByProgrammeChart(canvasId, alumniData) {
         return {
             label: role,
             data: programmes.map(prog => {
-                return alumniData.filter(al => al.Profile.Degrees[0]?.title === prog && al.Profile.EmploymentHistories[0]?.job_title === role).length;
+                return alumniData.filter(al => al.Profile?.Degrees?.[0]?.title === prog && al.Profile?.EmploymentHistories?.[0]?.job_title === role).length;
             }),
             backgroundColor: colors[idx]
         };
     });
 
-    if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    if (window.chartInstances[canvasId]) window.chartInstances[canvasId].destroy();
 
-    chartInstances[canvasId] = new Chart(ctx, {
+    window.chartInstances[canvasId] = new Chart(ctx, {
         type: 'bar',
         data: { labels: programmes, datasets },
         options: {
@@ -302,9 +292,7 @@ function drawRolesByProgrammeChart(canvasId, alumniData) {
     });
 }
 
-/**
- * Average Bid by Employer Chart
- */
+// draw chart for average bids by employer
 function drawBidsByEmployerChart(canvasId, employers, bids) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     
@@ -320,9 +308,9 @@ function drawBidsByEmployerChart(canvasId, employers, bids) {
         return 50 + Math.random() * 100;
     });
 
-    if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    if (window.chartInstances[canvasId]) window.chartInstances[canvasId].destroy();
 
-    chartInstances[canvasId] = new Chart(ctx, {
+    window.chartInstances[canvasId] = new Chart(ctx, {
         type: 'bar',
         data: {
             labels,
@@ -340,14 +328,19 @@ function drawBidsByEmployerChart(canvasId, employers, bids) {
     });
 }
 
-// Auto-download support for export page
+// check if we need to auto-download charts (for export page)
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('download') === 'true') {
         setTimeout(() => {
-            Object.keys(chartInstances).forEach(id => {
+            const instances = Object.keys(window.chartInstances);
+            if (instances.length === 0) {
+                console.warn("No chart instances found for download.");
+                return;
+            }
+            instances.forEach(id => {
                 downloadChart(id, `${id}_export.png`);
             });
-        }, 1500); // Wait for animations to finish
+        }, 3000); // Increased wait for heavy charts and animations
     }
 });

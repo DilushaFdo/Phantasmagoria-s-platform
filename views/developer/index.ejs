@@ -96,41 +96,19 @@
     </div>
 
     <div class="row">
-        <!-- SECTION 3: Usage Statistics -->
-        <div class="col-lg-8 mb-4">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold" style="color: var(--primary);">API Usage Statistics</h5>
-                    <span class="badge bg-light text-dark border" id="totalHitsBadge">Total Hits: 0</span>
-                </div>
-                <div class="card-body p-4">
-                    <div class="row g-4">
-                        <div class="col-md-6">
-                            <h6 class="fw-bold small mb-3 text-uppercase text-muted">Traffic (Last 7 Days)</h6>
-                            <canvas id="usageChart" height="200"></canvas>
-                        </div>
-                        <div class="col-md-6">
-                            <h6 class="fw-bold small mb-3 text-uppercase text-muted">Top Endpoints</h6>
-                            <div id="topEndpointsList" class="list-group list-group-flush">
-                                <!-- Injected by JS -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- SECTION 4: API Documentation Link -->
-        <div class="col-lg-4 mb-4">
-            <div class="card shadow-sm border-0 h-100 text-center bg-light border-primary-subtle">
-                <div class="card-body p-4 d-flex flex-column justify-content-center">
+        <div class="col-lg-12 mb-4">
+            <div class="card shadow-sm border-0 h-100 text-center bg-light border-primary-subtle py-4">
+                <div class="card-body p-4 d-flex flex-column align-items-center">
                     <div class="mb-3">
-                        <i class="bi bi-file-earmark-code-fill text-primary" style="font-size: 3rem;"></i>
+                        <i class="bi bi-file-earmark-code-fill text-primary" style="font-size: 4rem;"></i>
                     </div>
-                    <h5 class="fw-bold">API Documentation</h5>
-                    <p class="text-muted small">View full API documentation and test endpoints interactively using our Swagger interface.</p>
-                    <a href="/api-docs" target="_blank" class="btn btn-outline-primary mt-2">
-                        Open Swagger UI <i class="bi bi-box-arrow-up-right ms-1"></i>
+                    <h4 class="fw-bold">API Documentation & Sandbox</h4>
+                    <p class="text-muted mx-auto" style="max-width: 600px;">
+                        Access the full technical specification of our platform. You can interactively test all available endpoints using your API keys through our Swagger-powered sandbox.
+                    </p>
+                    <a href="/api-docs" target="_blank" class="btn btn-primary btn-lg px-5 mt-3 shadow-sm">
+                        Open Swagger UI <i class="bi bi-box-arrow-up-right ms-2"></i>
                     </a>
                 </div>
             </div>
@@ -153,13 +131,12 @@
 <script>
 let globalCsrf = '';
 let toastInstance = null;
-let usageChart = null;
+let usageChart = null; // Can be removed if completely unused, kept for now for compatibility if referenced elsewhere
 
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        const tokenRes = await fetch('/api/auth/csrf-token');
-        const tokenData = await tokenRes.json();
-        globalCsrf = tokenData.csrfToken;
+        const csrfToken = await getCsrfToken();
+        globalCsrf = csrfToken;
 
         await refreshDashboard();
 
@@ -177,16 +154,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function refreshDashboard() {
     try {
-        await Promise.all([
-            loadKeys(),
-            loadUsageStats()
-        ]);
+        await loadKeys();
     } catch (err) { handleFetchError(err); }
 }
 
 async function loadKeys() {
-    const res = await fetch('/api/developer/keys');
-    const data = await res.json();
+    try {
+        const data = await apiGet('/api/developer/keys');
+        renderKeysTable(data);
+    } catch (err) {
+        handleFetchError(err);
+    }
+}
+
+function renderKeysTable(data) {
     const tbody = document.getElementById('keysTableBody');
     const emptyState = document.getElementById('keysEmptyState');
     
@@ -215,7 +196,7 @@ async function loadKeys() {
                 <td><small>${lastUsed}</small></td>
                 <td class="pe-4 text-end">
                     ${!isRevoked ? `
-                        <button class="btn btn-sm btn-outline-danger" onclick="revokeKey(${key.id})">
+                        <button class="btn btn-sm btn-outline-danger btn-revoke-key" data-id="${key.id}">
                             <i class="bi bi-trash"></i>
                         </button>
                     ` : '-'}
@@ -223,79 +204,16 @@ async function loadKeys() {
             </tr>
         `;
     }).join('');
-}
 
-async function loadUsageStats() {
-    const [statsRes, dashboardRes] = await Promise.all([
-        fetch('/api/developer/usage-stats'),
-        fetch('/api/developer/dashboard')
-    ]);
-    
-    const stats = await statsRes.json();
-    const dashboard = await dashboardRes.json();
-    
-    document.getElementById('totalHitsBadge').textContent = `Total Hits: ${dashboard.api_usage.total_api_hits}`;
-
-    // Render Top Endpoints
-    const endpointList = document.getElementById('topEndpointsList');
-    if (!dashboard.api_usage.top_endpoints || dashboard.api_usage.top_endpoints.length === 0) {
-        endpointList.innerHTML = '<div class="alert alert-light small text-center text-muted py-4">No data available</div>';
-    } else {
-        endpointList.innerHTML = dashboard.api_usage.top_endpoints.map(ep => `
-            <div class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
-                <span class="text-truncate small font-monospace" style="max-width: 250px;">${ep.endpoint_accessed}</span>
-                <span class="badge bg-primary rounded-pill">${ep.hit_count}</span>
-            </div>
-        `).join('');
-    }
-
-    // Render Chart
-    renderUsageChart(stats.usageLogs || []);
-}
-
-function renderUsageChart(logs) {
-    const ctx = document.getElementById('usageChart').getContext('2d');
-    
-    const last7Days = [];
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        last7Days.push(d.toISOString().split('T')[0]);
-    }
-
-    const counts = last7Days.map(date => {
-        return logs.filter(log => log.timestamp.split('T')[0] === date).length;
-    });
-
-    if (usageChart) usageChart.destroy();
-    
-    usageChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: last7Days.map(d => {
-                const date = new Date(d);
-                return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-            }),
-            datasets: [{
-                label: 'Requests',
-                data: counts,
-                backgroundColor: 'rgba(52, 152, 219, 0.7)',
-                borderColor: 'rgba(52, 152, 219, 1)',
-                borderWidth: 0,
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } }, grid: { borderDash: [5, 5] } },
-                x: { grid: { display: false }, ticks: { font: { size: 10 } } }
-            },
-            plugins: { legend: { display: false } }
-        }
+    // Event listeners for revoke buttons (CSP compliance)
+    document.querySelectorAll('.btn-revoke-key').forEach(btn => {
+        btn.addEventListener('click', () => revokeKey(btn.dataset.id));
     });
 }
+
+
+
+
 
 async function handleGenerate(e) {
     e.preventDefault();
@@ -309,22 +227,13 @@ async function handleGenerate(e) {
     setBtnLoading(btn, true);
 
     try {
-        const res = await fetch('/api/developer/generate-key', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': globalCsrf },
-            body: JSON.stringify({ name, scopes })
-        });
-        const data = await res.json();
+        const data = await apiPost('/api/developer/generate-key', { name, scopes });
         
-        if (res.ok) {
-            document.getElementById('generatedKeyDisplay').value = data.raw_key;
-            document.getElementById('keySuccessBox').classList.remove('d-none');
-            showToast('Key generated successfully!');
-            await loadKeys();
-            document.getElementById('formGenerateKey').reset();
-        } else {
-            throw new Error(data.error || data.message || 'Failed to generate key');
-        }
+        document.getElementById('generatedKeyDisplay').value = data.raw_key;
+        document.getElementById('keySuccessBox').classList.remove('d-none');
+        showToast('Key generated successfully!');
+        await loadKeys();
+        document.getElementById('formGenerateKey').reset();
     } catch (err) {
         handleFetchError(err);
     } finally {
@@ -336,17 +245,9 @@ async function revokeKey(id) {
     if(!confirm('Are you sure you want to revoke this API key? This action is irreversible.')) return;
 
     try {
-        const res = await fetch(`/api/developer/revoke-key/${id}`, {
-            method: 'PUT',
-            headers: { 'X-CSRF-TOKEN': globalCsrf }
-        });
-        const data = await res.json();
-        if (res.ok) {
-            showToast('API key revoked.');
-            await loadKeys();
-        } else {
-            throw new Error(data.error || data.message || 'Failed to revoke');
-        }
+        await apiPut(`/api/developer/revoke-key/${id}`);
+        showToast('API key revoked.');
+        await loadKeys();
     } catch (err) {
         handleFetchError(err);
     }

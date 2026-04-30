@@ -1,4 +1,4 @@
-const { Bid, Profile, Sponsorship, Sponsor, Certification, Licence } = require('../models');
+const { Bid, Profile, Sponsorship, User, Certification, Licence } = require('../models');
 
 // Place a new bid for a specific day
 const placeBid = async (req, res) => {
@@ -7,25 +7,33 @@ const placeBid = async (req, res) => {
         const userId = req.user;
 
         if (!target_date || !bid_amount) {
-            return res.status(400).json({ error: 'target_date and bid_amount are required' });
+            return res.status(400).json({ success: false, error: 'MISSING_DATA', message: 'target_date and bid_amount are required' });
         }
 
         const profile = await Profile.findOne({ where: { UserId: userId } });
         if (!profile) {
-            return res.status(404).json({ error: 'Profile not found. Please create a profile first.' });
+            return res.status(404).json({ success: false, error: 'PROFILE_NOT_FOUND', message: 'Profile not found. Please create a profile first.' });
         }
 
         // Set the time to midnight so it's consistent for the whole day
         const normalizedDate = new Date(target_date);
         normalizedDate.setUTCHours(0, 0, 0, 0);
 
-        // Each user can only have one bid per day
+        // Each user can only have one active bid per day
         const existingBid = await Bid.findOne({
-            where: { UserId: userId, target_date: normalizedDate }
+            where: { 
+                UserId: userId, 
+                target_date: normalizedDate,
+                status: 'pending'
+            }
         });
+
         if (existingBid) {
             return res.status(400).json({ 
-                error: 'You already have a bid for this date. Please use the update API to change your bid amount instead.' 
+                success: false,
+                error: 'DUPLICATE_BID',
+                message: 'You already have an active bid for this date',
+                data: { currentBid: existingBid.bid_amount }
             });
         }
 
@@ -33,23 +41,27 @@ const placeBid = async (req, res) => {
         const maxWins = profile.attended_university_event ? 4 : 3;
 
         if (profile.monthly_win_count >= maxWins) {
-            return res.status(403).json({ error: 'Forbidden: You have reached your monthly win limit.' });
+            return res.status(403).json({ success: false, error: 'LIMIT_EXCEEDED', message: 'Forbidden: You have reached your monthly win limit.' });
         }
 
-        const availableAmount = await profile.getTotalSponsorshipAmount() || 0;
+        const walletBalance = parseFloat(profile.wallet_balance || 0);
+        const bidAmt = parseFloat(bid_amount);
 
-        if (availableAmount === 0) {
+        if (walletBalance <= 0) {
             return res.status(400).json({
-                error: 'You have no accepted sponsorships',
-                message: 'You need accepted sponsorship offers before you can place a bid'
+                success: false,
+                error: 'INSUFFICIENT_FUNDS',
+                message: 'You need accepted sponsorship offers before you can place a bid',
+                data: { walletBalance: 0 }
             });
         }
 
-        if (Number(bid_amount) > availableAmount) {
+        if (bidAmt > walletBalance) {
             return res.status(400).json({
-                error: 'Bid amount cannot exceed your total accepted sponsorship amount',
-                availableAmount,
-                message: `Your maximum bid is £${availableAmount} based on your accepted sponsorships`
+                success: false,
+                error: 'EXCEEDS_BALANCE',
+                message: `Your wallet balance is £${walletBalance.toFixed(2)}`,
+                data: { walletBalance: walletBalance }
             });
         }
 
@@ -59,10 +71,10 @@ const placeBid = async (req, res) => {
             UserId: userId
         });
 
-        return res.status(201).json({ message: 'Bid placed successfully', bid: newBid });
+        return res.status(201).json({ success: true, message: 'Bid placed successfully', data: { bid: newBid } });
     } catch (error) {
         console.error("Error placing bid:", error);
-        return res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: 'Internal server error' });
     }
 };
 
@@ -73,13 +85,13 @@ const getBidStatus = async (req, res) => {
         const userId = req.user;
 
         if (!target_date) {
-            return res.status(400).json({ error: 'target_date is required' });
+            return res.status(400).json({ success: false, error: 'MISSING_DATE', message: 'target_date is required' });
         }
 
         // Make sure the profile exists
         const profile = await Profile.findOne({ where: { UserId: userId } });
         if (!profile) {
-            return res.status(404).json({ error: 'Profile not found.' });
+            return res.status(404).json({ success: false, error: 'PROFILE_NOT_FOUND', message: 'Profile not found.' });
         }
 
         // Using midnight for consistency again
@@ -95,7 +107,7 @@ const getBidStatus = async (req, res) => {
         });
 
         if (!userBid) {
-            return res.status(404).json({ error: 'No bid found for this date.' });
+            return res.status(404).json({ success: false, error: 'BID_NOT_FOUND', message: 'No bid found for this date.' });
         }
 
         const maxBidAmount = await Bid.max('bid_amount', {
@@ -111,14 +123,14 @@ const getBidStatus = async (req, res) => {
         const isWinning = currentBidAmount === Number(maxBidAmount);
         
         // Fetch sponsorship information
-        const totalAvailableFromSponsors = await profile.getTotalSponsorshipAmount() || 0;
+        const totalAvailableFromSponsors = profile.wallet_balance || 0;
         const acceptedSponsorships = await Sponsorship.findAll({
             where: {
                 ProfileId: profile.id,
                 status: 'accepted'
             },
             include: [
-                { model: Sponsor, attributes: ['company_name'] },
+                { model: User, as: 'Sponsor', attributes: ['company_name'] },
                 { model: Certification },
                 { model: Licence }
             ]
@@ -139,18 +151,21 @@ const getBidStatus = async (req, res) => {
         const potentialEarnings = Math.max(0, totalAvailableFromSponsors - currentBidAmount);
 
         return res.status(200).json({ 
-            your_bid: currentBidAmount,
-            status: isWinning ? "winning" : "losing", 
-            remaining_monthly_slots: remainingSlots,
-            totalAvailableFromSponsors,
-            currentBidAmount,
-            potentialEarnings,
-            sponsorships: formattedSponsorships
+            success: true,
+            data: {
+                your_bid: currentBidAmount,
+                status: isWinning ? "winning" : "losing", 
+                remaining_monthly_slots: remainingSlots,
+                totalAvailableFromSponsors,
+                currentBidAmount,
+                potentialEarnings,
+                sponsorships: formattedSponsorships
+            }
         });
 
     } catch (error) {
         console.error("Error fetching bid status:", error);
-        return res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: 'Internal server error' });
     }
 };
 
@@ -161,12 +176,12 @@ const updateBid = async (req, res) => {
         const userId = req.user;
 
         if (!target_date || !new_bid_amount) {
-            return res.status(400).json({ error: 'target_date and new_bid_amount are required' });
+            return res.status(400).json({ success: false, error: 'MISSING_DATA', message: 'target_date and new_bid_amount are required' });
         }
 
         const profile = await Profile.findOne({ where: { UserId: userId } });
         if (!profile) {
-            return res.status(404).json({ error: 'Profile not found.' });
+            return res.status(404).json({ success: false, error: 'PROFILE_NOT_FOUND', message: 'Profile not found.' });
         }
 
         // Normalize the date to midnight
@@ -181,30 +196,32 @@ const updateBid = async (req, res) => {
         });
 
         if (!existingBid) {
-            return res.status(404).json({ error: 'No existing bid found for this date. Please place a new bid instead.' });
+            return res.status(404).json({ success: false, error: 'BID_NOT_FOUND', message: 'No existing bid found for this date. Please place a new bid instead.' });
         }
 
         if (Number(new_bid_amount) <= Number(existingBid.bid_amount)) {
-            return res.status(400).json({ error: 'Updated bid must be strictly greater than your current bid.' });
+            return res.status(400).json({ success: false, error: 'INVALID_AMOUNT', message: 'Updated bid must be strictly greater than your current bid.' });
         }
 
-        const availableAmount = await profile.getTotalSponsorshipAmount() || 0;
+        const walletBalance = parseFloat(profile.wallet_balance || 0);
+        const newBidAmt = parseFloat(new_bid_amount);
 
-        if (Number(new_bid_amount) > availableAmount) {
+        if (newBidAmt > walletBalance) {
             return res.status(400).json({
-                error: 'Bid amount cannot exceed your total accepted sponsorship amount',
-                availableAmount,
-                message: `Your maximum bid is £${availableAmount} based on your accepted sponsorships`
+                success: false,
+                error: 'EXCEEDS_BALANCE',
+                message: `Your wallet balance is £${walletBalance.toFixed(2)}`,
+                data: { walletBalance: walletBalance }
             });
         }
 
         existingBid.bid_amount = new_bid_amount;
         await existingBid.save();
 
-        return res.status(200).json({ message: 'Bid updated successfully', bid: existingBid });
+        return res.status(200).json({ success: true, message: 'Bid updated successfully', data: { bid: existingBid } });
     } catch (error) {
         console.error("Error updating bid:", error);
-        return res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: 'Internal server error' });
     }
 };
 
@@ -220,13 +237,13 @@ const getMyBids = async (req, res) => {
         });
 
         if (!bids || bids.length === 0) {
-            return res.status(200).json({ message: "You haven't placed any bids yet.", bids: [] });
+            return res.status(200).json({ success: true, message: "You haven't placed any bids yet.", data: { bids: [] } });
         }
 
-        return res.status(200).json({ bids });
+        return res.status(200).json({ success: true, data: { bids } });
     } catch (error) {
         console.error("Error retrieving user bids:", error);
-        return res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: 'Internal server error' });
     }
 };
 
@@ -236,7 +253,7 @@ const deleteBid = async (req, res) => {
         const { target_date } = req.query;
         
         if (!target_date) {
-            return res.status(400).json({ error: "target_date query parameter is required." });
+            return res.status(400).json({ success: false, error: 'MISSING_DATE', message: "target_date query parameter is required." });
         }
 
         // Normalize to midnight UTC
@@ -252,14 +269,14 @@ const deleteBid = async (req, res) => {
         });
 
         if (!bid) {
-            return res.status(404).json({ error: "No pending bid found for this date." });
+            return res.status(404).json({ success: false, error: 'BID_NOT_FOUND', message: "No pending bid found for this date." });
         }
 
         await bid.destroy();
-        res.status(200).json({ message: "Bid deleted successfully." });
+        res.status(200).json({ success: true, message: "Bid deleted successfully." });
     } catch (error) {
         console.error("Error deleting bid:", error);
-        res.status(500).json({ error: "Failed to delete bid." });
+        res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to delete bid." });
     }
 };
 
@@ -279,20 +296,24 @@ const getTomorrowStatus = async (req, res) => {
 
         if (bid) {
             return res.status(200).json({
-                bid_placed: true,
-                amount: bid.bid_amount,
-                status: bid.status,
-                message: "You have already placed a bid for tomorrow's slot."
+                success: true,
+                message: "You have already placed a bid for tomorrow's slot.",
+                data: {
+                    bid_placed: true,
+                    amount: bid.bid_amount,
+                    status: bid.status
+                }
             });
         } else {
             return res.status(200).json({
-                bid_placed: false,
-                message: "You have not placed a bid for tomorrow yet."
+                success: true,
+                message: "You have not placed a bid for tomorrow yet.",
+                data: { bid_placed: false }
             });
         }
     } catch (error) {
         console.error("Error fetching tomorrow's status:", error);
-        res.status(500).json({ error: "Failed to fetch tomorrow's status." });
+        res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch tomorrow's status." });
     }
 };
 
@@ -301,7 +322,7 @@ const getMonthlyLimitStatus = async (req, res) => {
     try {
         const profile = await Profile.findOne({ where: { UserId: req.user } });
         if (!profile) {
-            return res.status(404).json({ error: "Profile not found." });
+            return res.status(404).json({ success: false, error: 'PROFILE_NOT_FOUND', message: "Profile not found." });
         }
 
         // Standard limit is 3, but event attendees get 4
@@ -309,14 +330,17 @@ const getMonthlyLimitStatus = async (req, res) => {
         const remainingSlots = Math.max(0, maxWins - profile.monthly_win_count);
 
         res.status(200).json({
-            monthly_win_count: profile.monthly_win_count,
-            max_allowed_wins: maxWins,
-            remaining_slots: remainingSlots,
-            attended_university_event: profile.attended_university_event
+            success: true,
+            data: {
+                monthly_win_count: profile.monthly_win_count,
+                max_allowed_wins: maxWins,
+                remaining_slots: remainingSlots,
+                attended_university_event: profile.attended_university_event
+            }
         });
     } catch (error) {
         console.error("Error fetching monthly limit status:", error);
-        res.status(500).json({ error: "Failed to fetch monthly limit status." });
+        res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch monthly limit status." });
     }
 };
 

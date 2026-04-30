@@ -97,12 +97,16 @@
         try {
             const query = new URLSearchParams({...filters, limit}).toString();
             const [empRes, bidRes] = await Promise.all([
-                fetch(`/api/analytics/employment?${query}`, { headers: getAuthHeaders() }),
-                fetch(`/api/analytics/bidding`, { headers: getAuthHeaders() })
+                fetch(`/api/analytics/employment?${query}`, { headers: getAuthHeaders(), credentials: 'include' }),
+                fetch(`/api/analytics/bidding`, { headers: getAuthHeaders(), credentials: 'include' })
             ]);
 
-            const empData = await empRes.json();
-            const bidData = await bidRes.json();
+            const empJson = await empRes.json();
+            const bidJson = await bidRes.json();
+            const empData = empJson.data || empJson;
+            const bidData = bidJson.data || bidJson;
+
+            const employers = empData.topEmployers || [];
 
             // Draw Employer Volume
             const ctx1 = document.getElementById('employerVolumeChart').getContext('2d');
@@ -110,23 +114,23 @@
             chartInstances['employerVolumeChart'] = new Chart(ctx1, {
                 type: 'bar',
                 data: {
-                    labels: empData.topEmployers.map(e => e.company),
-                    datasets: [{ label: 'Alumni', data: empData.topEmployers.map(e => e.count), backgroundColor: '#2ecc71' }]
+                    labels: employers.map(e => e.company),
+                    datasets: [{ label: 'Alumni', data: employers.map(e => e.count), backgroundColor: '#2ecc71' }]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
             });
 
             // Draw Bids by Employer
-            drawBidsByEmployerChart('avgBidChart', empData.topEmployers, bidData.averageBidByMonth);
+            drawBidsByEmployerChart('avgBidChart', employers, bidData.averageBidByMonth || []);
 
             // Update Stats
-            const top = empData.topEmployers[0];
+            const top = employers[0];
             document.getElementById('statEmployerName').textContent = top?.company || 'None';
             document.getElementById('statEmployerCount').textContent = top?.count || '0';
             
             // Calculate concentration
-            const top3Sum = empData.topEmployers.slice(0, 3).reduce((s, e) => s + parseInt(e.count), 0);
-            const total = empData.topEmployers.reduce((s, e) => s + parseInt(e.count), 0);
+            const top3Sum = employers.slice(0, 3).reduce((s, e) => s + parseInt(e.count), 0);
+            const total = employers.reduce((s, e) => s + parseInt(e.count), 0);
             document.getElementById('statConcentration').textContent = total > 0 ? ((top3Sum / total) * 100).toFixed(1) + '%' : '0%';
 
         } catch (err) {

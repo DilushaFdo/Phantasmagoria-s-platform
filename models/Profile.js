@@ -39,19 +39,13 @@ const Profile = sequelize.define("Profile", {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
     },
+    wallet_balance: {
+        type: DataTypes.DECIMAL(10, 2),
+        defaultValue: 0.00,
+        allowNull: false
+    }
 });
 
-Profile.prototype.getTotalSponsorshipAmount = async function() {
-    const sponsorships = await sequelize.models.Sponsorship.findAll({
-        where: {
-            ProfileId: this.id,
-            status: 'accepted'
-        }
-    });
-    
-    return sponsorships.reduce((total, sponsorship) => {
-        return total + Number(sponsorship.offer_amount);
-    }, 0);
-};
+
 
 module.exports = Profile;

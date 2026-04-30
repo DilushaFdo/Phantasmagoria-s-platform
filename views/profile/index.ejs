@@ -59,10 +59,7 @@
                     Edit Profile
                 </a>
 
-                <!-- Sponsor Button (Visible only to Sponsors) -->
-                <button id="sponsorBtn" class="btn btn-accent w-100 mt-3 d-none" data-bs-toggle="modal" data-bs-target="#sponsorshipModal">
-                    <i class="bi bi-award me-2"></i> Sponsor this Alumnus
-                </button>
+
             </div>
         </div>
 
@@ -194,15 +191,20 @@
 const loggedInUserId = <%- JSON.stringify(locals.user ? locals.user.id : null) %>;
 const userRole = <%- JSON.stringify(locals.user ? locals.user.role : null) %>;
 let currentProfileData = null;
+let globalCsrf = '';
 
 document.addEventListener('DOMContentLoaded', async () => {
     try {
+        // Fetch CSRF token
+        const csrfToken = await getCsrfToken();
+        globalCsrf = csrfToken;
+
         // Detect if viewing a specific profile from URL
         const pathParts = window.location.pathname.split('/');
         const profileId = pathParts[pathParts.length - 1] === 'profile' ? null : pathParts[pathParts.length - 1];
         
         const fetchUrl = profileId ? `/api/profile/${profileId}` : '/api/profile';
-        const res = await fetch(fetchUrl);
+        const res = await fetch(fetchUrl, { credentials: 'include' });
         
         if (res.status === 404 || res.status === 204) {
             if (!profileId) {
@@ -215,15 +217,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (!res.ok) throw new Error('Failed to load profile');
-        const data = await res.json();
+        const json = await res.json();
+        const data = json.data || json;
         currentProfileData = data;
 
-        if (!data || !data.id) {
+        if (!data || !data.UserId) {
             showEmptyState();
             return;
         }
         
         renderProfile(data);
+
+        // Attach event listener for the sponsorship offer button
+        const sendOfferBtn = document.getElementById('sendOfferBtn');
+        if (sendOfferBtn) {
+            sendOfferBtn.addEventListener('click', handleSendOffer);
+        }
 
     } catch (err) {
         console.error(err);
@@ -305,6 +314,8 @@ async function renderProfile(data) {
 
     const renderList = (containerId, items, titleKey, subtitleKey, dateKey, dateLabel, emptyMsg) => {
         const container = document.getElementById(containerId);
+        const isOwner = loggedInUserId && (currentProfileData.UserId === loggedInUserId);
+
         if (!items || items.length === 0) {
             container.innerHTML = `<div class="text-center py-4 text-muted fst-italic"><i class="bi bi-inbox fs-2 d-block mb-2"></i> ${emptyMsg}</div>`;
             return;
@@ -315,8 +326,16 @@ async function renderProfile(data) {
             const dateStr = formatDate(item[dateKey]);
             const urlHtml = item.url || item.credential_url ? `<a href="${item.url || item.credential_url}" target="_blank" class="float-end btn btn-sm btn-outline-primary" style="font-size: 0.75rem;">View</a>` : '';
             
+            // Sponsor button for sponsors viewing others' profiles
+            let sponsorHtml = '';
+            if (userRole === 'sponsor' && !isOwner && (containerId === 'certList' || containerId === 'licenceList')) {
+                const type = containerId === 'certList' ? 'cert' : 'lic';
+                sponsorHtml = `<button class="float-end btn btn-sm btn-accent ms-2 fw-bold" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#sponsorshipModal" onclick="preSelectSponsorItem('${type}', ${item.id})"><i class="bi bi-award me-1"></i> Sponsor</button>`;
+            }
+
             html += `
                 <li class="list-group-item px-0 py-3">
+                    ${sponsorHtml}
                     ${urlHtml}
                     <h6 class="mb-1 fw-bold text-dark">${item[titleKey]}</h6>
                     <p class="mb-1 text-muted small">${subtitleKey && item[subtitleKey] ? item[subtitleKey] + ' &bull; ' : ''}${dateLabel}: ${dateStr}</p>
@@ -325,6 +344,13 @@ async function renderProfile(data) {
         });
         html += '</ul>';
         container.innerHTML = html;
+    };
+
+    window.preSelectSponsorItem = (type, id) => {
+        const select = document.getElementById('sponsorItemSelect');
+        if (select) {
+            select.value = `${type}_${id}`;
+        }
     };
 
     renderList('degreeList', data.Degrees, 'title', null, 'completion_date', 'Completed', 'No degrees added.');
@@ -385,18 +411,20 @@ async function fetchBiddingStatus(profileData) {
     const slotsDiv = document.getElementById('monthlySlots');
     
     try {
-        slotsDiv.textContent = profileData.remaining_monthly_slots;
-        const tomorrowRes = await fetch('/api/bids/tomorrow');
-        const tData = await tomorrowRes.json();
+        slotsDiv.textContent = profileData.remaining_monthly_slots || 0;
+        const tomorrowRes = await fetch('/api/bids/tomorrow', { credentials: 'include' });
+        const tomorrowJson = await tomorrowRes.json();
+        const tData = tomorrowJson.data || tomorrowJson;
         
         if (tData.bid_placed) {
             const tmrwDate = new Date();
             tmrwDate.setDate(tmrwDate.getDate() + 1);
             const dateStr = tmrwDate.toISOString().split('T')[0];
-            const statusRes = await fetch(`/api/bids/status?target_date=${dateStr}`);
+            const statusRes = await fetch(`/api/bids/status?target_date=${dateStr}`, { credentials: 'include' });
+            const statusJson = await statusRes.json();
+            const sData = statusJson.data || statusJson;
             
             if (statusRes.ok) {
-                const sData = await statusRes.json();
                 const badgeColor = sData.status === 'winning' ? 'bg-success' : 'bg-danger';
                 const statusText = sData.status === 'winning' ? 'Currently Winning!' : 'Currently Losing';
                 contentDiv.innerHTML = `
@@ -424,9 +452,6 @@ async function fetchBiddingStatus(profileData) {
 }
 
 function setupSponsorshipModal(data) {
-    const sponsorBtn = document.getElementById('sponsorBtn');
-    if (sponsorBtn) sponsorBtn.classList.remove('d-none');
-
     const select = document.getElementById('sponsorItemSelect');
     if (!select) return;
 
@@ -465,6 +490,9 @@ function setupSponsorshipModal(data) {
 }
 
 async function handleSendOffer() {
+    // Debug check
+    console.log("handleSendOffer called");
+    
     const itemValue = document.getElementById('sponsorItemSelect').value;
     const amount = document.getElementById('sponsorAmount').value;
     const message = document.getElementById('sponsorMessage').value;
@@ -482,18 +510,21 @@ async function handleSendOffer() {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
 
-        const res = await fetch('/api/sponsorship/create', {
+        const csrfToken = await getCsrfToken();
+        const res = await fetch('/api/sponsorship/offer', {
             method: 'POST',
             headers: { 
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
             },
             body: JSON.stringify({
-                profileId: currentProfileData.id,
-                amount,
+                ProfileId: currentProfileData.id,
+                offer_amount: amount,
                 message,
-                certificationId: type === 'certification' ? itemId : null,
-                licenceId: type === 'licence' ? itemId : null
-            })
+                CertificationId: type === 'certification' ? itemId : null,
+                LicenceId: type === 'licence' ? itemId : null
+            }),
+            credentials: 'include'
         });
 
         const result = await res.json();
@@ -549,7 +580,7 @@ async function handleSendOffer() {
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="sendOfferBtn" class="btn btn-accent px-4" onclick="handleSendOffer()">Send Offer</button>
+                <button type="button" id="sendOfferBtn" class="btn btn-accent px-4">Send Offer</button>
             </div>
         </div>
     </div>

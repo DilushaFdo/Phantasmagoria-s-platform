@@ -4,7 +4,7 @@ const {
     register, 
     verifyEmail, 
     login, 
-    forgotPassword, // Note: the controller has forgotPassword, but the route was using requestPasswordReset in my previous attempt.
+    forgotPassword,
     resetPassword, 
     logout 
 } = require("../controllers/authController");

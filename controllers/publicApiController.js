@@ -19,13 +19,13 @@ const getFeaturedAlumnus = async (req, res) => {
         });
 
         if (!featuredProfile) {
-            return res.status(404).json({ message: "No featured alumnus available for today." });
+            return res.status(404).json({ success: false, error: 'NOT_FOUND', message: "No featured alumnus available for today." });
         }
 
-        res.status(200).json(featuredProfile);
+        res.status(200).json({ success: true, data: featuredProfile });
     } catch (error) {
         console.error("Error fetching featured alumnus:", error);
-        res.status(500).json({ error: "Failed to fetch featured alumnus" });
+        res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Failed to fetch featured alumnus" });
     }
 };
 

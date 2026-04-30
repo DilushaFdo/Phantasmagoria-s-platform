@@ -73,10 +73,8 @@
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        const res = await fetch('/api/sponsor/dashboard-data');
-        if (!res.ok) throw new Error('Failed to fetch dashboard data');
-        
-        const data = await res.json();
+        const data = await apiGet('/api/sponsorship/dashboard-data');
+        if (!data) return;
         
         // Update Stats
         document.getElementById('totalOffers').textContent = data.stats.totalOffers || 0;

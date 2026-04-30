@@ -96,14 +96,15 @@
 
         try {
             const query = new URLSearchParams(filters).toString();
-            const res = await fetch(`/api/analytics/employment?${query}`, { headers: getAuthHeaders() });
-            const data = await res.json();
+            const res = await fetch(`/api/analytics/employment?${query}`, { headers: getAuthHeaders(), credentials: 'include' });
+            const json = await res.json();
+            const data = json.data || json;
 
-            drawEmployerDoughnut('employerChart', data.topEmployers);
-            drawTrendLineChart('trendChart', data.employmentTrends);
+            drawEmployerDoughnut('employerChart', data.topEmployers || []);
+            drawTrendLineChart('trendChart', data.employmentTrends || []);
 
-            document.getElementById('statTopRole').textContent = data.topRoles[0]?.job_title || 'None';
-            document.getElementById('statTopEmployer').textContent = data.topEmployers[0]?.company || 'None';
+            document.getElementById('statTopRole').textContent = data.topRoles?.[0]?.job_title || 'None';
+            document.getElementById('statTopEmployer').textContent = data.topEmployers?.[0]?.company || 'None';
 
         } catch (err) {
             console.error(err);

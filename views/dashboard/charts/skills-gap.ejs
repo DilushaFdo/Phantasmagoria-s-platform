@@ -16,7 +16,7 @@
                         <div class="card border-0 shadow-sm h-100">
                             <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
                                 <h6 class="fw-bold mb-0">Certs vs Courses Density</h6>
-                                <button class="btn btn-sm btn-link text-decoration-none" onclick="downloadChart('radarChart', 'skills_radar.png')">
+                                <button class="btn btn-sm btn-link text-decoration-none btn-download-chart" data-chart="radarChart" data-filename="skills_radar.png">
                                     <i class="bi bi-download"></i> PNG
                                 </button>
                             </div>
@@ -59,7 +59,7 @@
                         <div class="card border-0 shadow-sm">
                             <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
                                 <h6 class="fw-bold mb-0">Top 10 Certifications (Popularity Analysis)</h6>
-                                <button class="btn btn-sm btn-link text-decoration-none" onclick="downloadChart('gapBarChart', 'cert_popularity.png')">
+                                <button class="btn btn-sm btn-link text-decoration-none btn-download-chart" data-chart="gapBarChart" data-filename="cert_popularity.png">
                                     <i class="bi bi-download"></i> PNG
                                 </button>
                             </div>
@@ -87,6 +87,15 @@
     document.addEventListener('DOMContentLoaded', () => {
         initFilters(loadData);
         loadData({});
+
+        // Handle downloads without inline onclick (CSP compliance)
+        document.querySelectorAll('.btn-download-chart').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const chartId = btn.dataset.chart;
+                const filename = btn.dataset.filename;
+                downloadChart(chartId, filename);
+            });
+        });
     });
 
     async function loadData(filters) {
@@ -98,25 +107,32 @@
         try {
             const query = new URLSearchParams(filters).toString();
             const [certRes, courseRes, overviewRes] = await Promise.all([
-                fetch(`/api/analytics/certifications?${query}`, { headers: getAuthHeaders() }),
-                fetch(`/api/analytics/courses?${query}`, { headers: getAuthHeaders() }),
-                fetch(`/api/analytics/overview`, { headers: getAuthHeaders() })
+                fetch(`/api/analytics/certifications?${query}`, { headers: getAuthHeaders(), credentials: 'include' }),
+                fetch(`/api/analytics/courses?${query}`, { headers: getAuthHeaders(), credentials: 'include' }),
+                fetch(`/api/analytics/overview`, { headers: getAuthHeaders(), credentials: 'include' })
             ]);
 
-            const certData = await certRes.json();
-            const courseData = await courseRes.json();
-            const overview = await overviewRes.json();
+            const certJson = await certRes.json();
+            const courseJson = await courseRes.json();
+            const overviewJson = await overviewRes.json();
+
+            const certData = certJson.data || certJson;
+            const courseData = courseJson.data || courseJson;
+            const overview = overviewJson.data || overviewJson;
+
+            const certs = certData.mostPopular || [];
+            const courses = courseData.mostPopular || [];
 
             // Draw Charts
-            drawRadarChart('radarChart', certData.mostPopular, courseData.mostPopular);
-            drawGapAnalysisChart('gapBarChart', certData.mostPopular, overview.totalAlumni);
+            drawRadarChart('radarChart', certs, courses);
+            drawGapAnalysisChart('gapBarChart', certs, overview.totalAlumni || 1);
 
             // Update Stats
-            const topGap = certData.mostPopular[0];
+            const topGap = certs[0];
             document.getElementById('statCriticalGap').textContent = topGap?.title || 'None';
             document.getElementById('statAffected').textContent = `${topGap?.count || 0} alumni affected`;
             
-            const fastest = certData.mostPopular[1]?.title || 'AWS Cloud';
+            const fastest = certs[1]?.title || 'None';
             document.getElementById('statFastestGrow').textContent = fastest;
 
         } catch (err) {

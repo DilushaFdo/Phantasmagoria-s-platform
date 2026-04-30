@@ -36,7 +36,7 @@ router.get('/my-offers', authMiddleware, sponsorshipController.getMyOffers);
 
 /**
  * @swagger
- * /api/sponsorship/respond:
+ * /api/sponsorship/respond/{id}:
  *   post:
  *     summary: Accept or reject a sponsorship offer
  *     description: Allows alumni to accept or reject a pending sponsorship offer targeted at them.
@@ -44,16 +44,21 @@ router.get('/my-offers', authMiddleware, sponsorshipController.getMyOffers);
  *     security:
  *       - bearerAuth: []
  *         csrfToken: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the sponsorship offer
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [sponsorshipId, action]
+ *             required: [action]
  *             properties:
- *               sponsorshipId:
- *                 type: integer
  *               action:
  *                 type: string
  *                 enum: [accept, reject]
@@ -67,7 +72,7 @@ router.get('/my-offers', authMiddleware, sponsorshipController.getMyOffers);
  *       404:
  *         description: Offer not found or doesn't belong to user
  */
-router.post('/respond', authMiddleware, sponsorshipController.respondToOffer);
+router.post('/respond/:id', authMiddleware, sponsorshipController.respondToOffer);
 
 /**
  * @swagger
@@ -124,7 +129,66 @@ router.get('/available-amount', authMiddleware, sponsorshipController.getAvailab
  *         description: Profile not found
  */
 router.get('/summary', authMiddleware, sponsorshipController.getSponsorshipSummary);
+/**
+ * @swagger
+ * /api/sponsorship/alumni:
+ *   get:
+ *     summary: Get all alumni with their credentials for sponsorship
+ *     description: Returns a list of alumni profiles including their certifications and licences, enriched with a flag indicating if the current sponsor has already made an offer.
+ *     tags: [Sponsorship]
+ *     security:
+ *       - bearerAuth: []
+ *         csrfToken: []
+ *     responses:
+ *       200:
+ *         description: Alumni list retrieved successfully
+ */
+router.get('/alumni', authMiddleware, sponsorshipController.getAlumniForSponsorship);
 
-router.post('/create', authMiddleware, sponsorshipController.createOffer);
+/**
+ * @swagger
+ * /api/sponsorship/offer:
+ *   post:
+ *     summary: Create a sponsorship offer for a specific credential
+ *     description: Allows a sponsor to make a financial offer to an alumni for a specific certification or licence they hold.
+ *     tags: [Sponsorship]
+ *     security:
+ *       - bearerAuth: []
+ *         csrfToken: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ProfileId, offer_amount]
+ *             properties:
+ *               ProfileId: { type: integer }
+ *               CertificationId: { type: integer }
+ *               LicenceId: { type: integer }
+ *               offer_amount: { type: number }
+ *               message: { type: string }
+ *     responses:
+ *       201:
+ *         description: Offer sent successfully
+ *       400:
+ *         description: Invalid input or duplicate offer
+ */
+router.post('/offer', authMiddleware, sponsorshipController.createOffer);
+
+/**
+ * @swagger
+ * /api/sponsorship/dashboard-data:
+ *   get:
+ *     summary: Get dashboard statistics and recent offers for the logged-in sponsor
+ *     tags: [Sponsorship]
+ *     security:
+ *       - bearerAuth: []
+ *         csrfToken: []
+ *     responses:
+ *       200:
+ *         description: Dashboard data retrieved successfully
+ */
+router.get('/dashboard-data', authMiddleware, sponsorshipController.getDashboardData);
 
 module.exports = router;

@@ -1,9 +1,17 @@
-/**
- * Global UI Helpers for Phantasmagoria
- */
+// shared javascript helpers for the frontend
 
-// Toast Notifications
-const showToast = (message, type = 'success') => {
+// helpers for api auth and keys
+window.getApiKey = () => document.querySelector('meta[name="api-key"]')?.content;
+window.getAuthHeaders = () => {
+    const key = window.getApiKey();
+    if (key && key !== "undefined" && key !== "") {
+        return { 'Authorization': `Bearer ${key}` };
+    }
+    return {};
+};
+
+// show popup notifications on the screen
+window.showToast = (message, type = 'success') => {
     const toastContainer = document.getElementById('toast-container');
     if (!toastContainer) {
         const container = document.createElement('div');
@@ -36,8 +44,8 @@ const showToast = (message, type = 'success') => {
     });
 };
 
-// Loading State for Buttons
-const setBtnLoading = (btn, isLoading, originalText = 'Submit') => {
+// show loading state when clicking buttons
+window.setBtnLoading = (btn, isLoading, originalText = 'Submit') => {
     if (isLoading) {
         btn.disabled = true;
         btn.dataset.originalText = btn.innerHTML;
@@ -48,34 +56,32 @@ const setBtnLoading = (btn, isLoading, originalText = 'Submit') => {
     }
 };
 
-// Global Fetch Error Handler
-const handleFetchError = (err) => {
+// handle errors from fetch calls
+window.handleFetchError = (err) => {
     console.error('Fetch error:', err);
-    showToast(err.message || 'An unexpected error occurred. Please try again.', 'error');
+    window.showToast(err.message || 'An unexpected error occurred. Please try again.', 'error');
 };
 
-// Ensure redirects on 401
+// wrap fetch to always include cookies and check for expired sessions
 const originalFetch = window.fetch;
-window.fetch = async (...args) => {
-    const response = await originalFetch(...args);
+window.fetch = async (input, init = {}) => {
+    init.credentials = init.credentials || 'include';
+    
+    const response = await originalFetch(input, init);
     if (response.status === 401) {
         const clone = response.clone();
         try {
             const data = await clone.json();
-            // Only redirect if it's actually a session expiry, not just a missing API key
             if (data.error && data.error.toLowerCase().includes('session')) {
                 window.location.href = '/login?expired=true';
             }
-        } catch (e) {
-            // Not JSON or other error, don't redirect automatically
-        }
+        } catch (e) {}
     }
     return response;
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Check for expired session param
     if (new URLSearchParams(window.location.search).get('expired') === 'true') {
-        showToast('Your session has expired. Please login again.', 'error');
+        window.showToast('Your session has expired. Please login again.', 'error');
     }
 });

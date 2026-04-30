@@ -6,7 +6,7 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require("../lib/emailS
 const { createTargetedCsrfToken } = require("../lib/csrfMiddleware");
 const { Op } = require("sequelize");
 
-// Register a new user, hash their password, and send a verification email
+// function for registering a new user
 const register = async (req, res) => {
     try {
         const { email, password, role, company_name, first_name, last_name } = req.body;
@@ -14,28 +14,30 @@ const register = async (req, res) => {
         const assignedRole = role === 'sponsor' ? 'sponsor' : 'alumni';
 
         if (assignedRole === 'sponsor' && !company_name) {
-            return res.status(400).json({ message: "Company name is required for sponsors." });
+            return res.status(400).json({ success: false, error: 'MISSING_COMPANY', message: "Company name is required for sponsors." });
         }
 
         if (assignedRole === 'alumni' && (!first_name || !last_name)) {
-            return res.status(400).json({ message: "First name and last name are required for alumni." });
+            return res.status(400).json({ success: false, error: 'MISSING_NAME', message: "First name and last name are required for alumni." });
         }
 
-        // Check for duplicate email (Business logic remains, format validation moved to middleware)
+        // check if email already exists in db
         const existingUser = await User.findOne({ where: { email } });
         if (existingUser) {
             return res.status(400).json({
+                success: false,
+                error: 'DUPLICATE_EMAIL',
                 message: "An account with this email already exists.",
             });
         }
 
-        // Hash the password before saving for security
+        // hash password with bcrypt
         const password_hash = await bcrypt.hash(password, 10);
 
-        // Create a random token for the verification link
+        // make a token for verifying email
         const verification_token = crypto.randomBytes(32).toString("hex");
 
-        // Add the user to the database with an expiry on the token
+        // save user to database
         const newUser = await User.create({
             email,
             password_hash,
@@ -55,49 +57,50 @@ const register = async (req, res) => {
             });
         }
 
-        // Send the actual verification email
+        // send email to the user
         await sendVerificationEmail(email, verification_token);
 
         return res.status(201).json({
+            success: true,
             message: "User registered successfully. Please check your email to verify your account.",
-            user: { id: newUser.id, email: newUser.email },
+            data: { user: { id: newUser.id, email: newUser.email } },
         });
     } catch (error) {
         console.error("Registration error:", error);
-        return res.status(500).json({ message: "Internal server error." });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Internal server error." });
     }
 };
 
-// Verify the user's email using the token from the email link
+// verify user email with the token
 const verifyEmail = async (req, res) => {
     try {
         const { token } = req.query;
 
         if (!token) {
-            return res.status(400).json({ message: "Verification token is required." });
+            return res.status(400).json({ success: false, error: 'MISSING_TOKEN', message: "Verification token is required." });
         }
 
-        // Find the user with this token
+        // find user by token
         const user = await User.findOne({ where: { verification_token: token } });
         if (!user) {
-            return res.status(400).json({ message: "Invalid or expired verification token." });
+            return res.status(400).json({ success: false, error: 'INVALID_TOKEN', message: "Invalid or expired verification token." });
         }
 
-        // Check if the verification token has expired (24-hour window)
+        // check if token is too old
         if (user.verification_token_expiry && Date.now() > new Date(user.verification_token_expiry).getTime()) {
-            return res.status(400).json({ message: "Verification token has expired. Please register again." });
+            return res.status(400).json({ success: false, error: 'TOKEN_EXPIRED', message: "Verification token has expired. Please register again." });
         }
 
-        // Update user status
+        // mark user as verified and clear tokens
         user.is_verified = true;
         user.verification_token = null;
         user.verification_token_expiry = null;
         await user.save();
 
-        return res.status(200).json({ message: "Email verified successfully. You can now log in." });
+        return res.status(200).json({ success: true, message: "Email verified successfully. You can now log in." });
     } catch (error) {
         console.error("Email verification error:", error);
-        return res.status(500).json({ message: "Internal server error." });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Internal server error." });
     }
 };
 
@@ -109,7 +112,7 @@ const login = async (req, res) => {
         // Look up the user by email
         const user = await User.findOne({ where: { email } });
         if (!user) {
-            return res.status(401).json({ message: "Invalid email or password." });
+            return res.status(401).json({ success: false, error: 'INVALID_CREDENTIALS', message: "Invalid email or password." });
         }
 
         // Clean up any old sessions or CSRF tokens for this user/IP
@@ -132,6 +135,8 @@ const login = async (req, res) => {
         // Users must verify their email before they can log in
         if (!user.is_verified) {
             return res.status(401).json({
+                success: false,
+                error: 'EMAIL_UNVERIFIED',
                 message: "Please verify your email address before logging in.",
             });
         }
@@ -139,7 +144,7 @@ const login = async (req, res) => {
         // Verify password
         const isMatch = await bcrypt.compare(password, user.password_hash);
         if (!isMatch) {
-            return res.status(401).json({ message: "Invalid email or password." });
+            return res.status(401).json({ success: false, error: 'INVALID_CREDENTIALS', message: "Invalid email or password." });
         }
 
         // Generate JWT token
@@ -176,13 +181,16 @@ const login = async (req, res) => {
         });
 
         return res.status(200).json({
+            success: true,
             message: "Login successful.",
-            user: { id: user.id, email: user.email, role: user.role },
-            csrfToken: newCsrfToken
+            data: {
+                user: { id: user.id, email: user.email, role: user.role },
+                csrfToken: newCsrfToken
+            }
         });
     } catch (error) {
         console.error("Login error:", error);
-        return res.status(500).json({ message: "Internal server error." });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Internal server error." });
     }
 };
 
@@ -194,7 +202,7 @@ const forgotPassword = async (req, res) => {
         const user = await User.findOne({ where: { email } });
         if (!user) {
             // Standard security message so we don't leak which emails are registered
-            return res.status(200).json({ message: "If an account exists with that email, a reset link has been sent." });
+            return res.status(200).json({ success: true, message: "If an account exists with that email, a reset link has been sent." });
         }
 
         // Generate a secure reset token that lasts for 1 hour
@@ -208,10 +216,10 @@ const forgotPassword = async (req, res) => {
         // Send real reset email
         await sendPasswordResetEmail(email, reset_token);
 
-        return res.status(200).json({ message: "If an account exists with that email, a reset link has been sent." });
+        return res.status(200).json({ success: true, message: "If an account exists with that email, a reset link has been sent." });
     } catch (error) {
         console.error("Forgot password error:", error);
-        return res.status(500).json({ message: "Internal server error." });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Internal server error." });
     }
 };
 
@@ -231,7 +239,7 @@ const resetPassword = async (req, res) => {
         });
 
         if (!user) {
-            return res.status(400).json({ message: "Invalid or expired reset token." });
+            return res.status(400).json({ success: false, error: 'INVALID_TOKEN', message: "Invalid or expired reset token." });
         }
 
         // Update password and clear reset fields
@@ -243,10 +251,10 @@ const resetPassword = async (req, res) => {
         // Destroy all active sessions for this user (force logout everywhere)
         await Session.destroy({ where: { UserId: user.id } });
 
-        return res.status(200).json({ message: "Password reset successful. All active sessions have been terminated. Please log in with your new password." });
+        return res.status(200).json({ success: true, message: "Password reset successful. All active sessions have been terminated. Please log in with your new password." });
     } catch (error) {
         console.error("Reset password error:", error);
-        return res.status(500).json({ message: "Internal server error." });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Internal server error." });
     }
 };
 
@@ -281,15 +289,16 @@ const logout = async (req, res) => {
         const newCsrfToken = await createTargetedCsrfToken(req);
 
         return res.status(200).json({ 
+            success: true,
             message: "Logged out successfully.",
-            csrfToken: newCsrfToken
+            data: { csrfToken: newCsrfToken }
         });
     } catch (error) {
         console.error("Logout error:", error);
         if (req.method === 'GET') {
             return res.redirect("/login");
         }
-        return res.status(500).json({ message: "Internal server error." });
+        return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: "Internal server error." });
     }
 };
 

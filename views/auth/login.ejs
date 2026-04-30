@@ -52,14 +52,14 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     errorDiv.classList.add('d-none');
     
     try {
-        // Fetch CSRF token
-        const tokenRes = await fetch('/api/auth/csrf-token');
-        const tokenData = await tokenRes.json();
-        const csrfToken = tokenData.csrfToken;
+        // Fetch CSRF token using shared helper
+        const csrfToken = await getCsrfToken();
+        if (!csrfToken) throw new Error("Failed to secure the session. Please refresh.");
 
         // Attempt Login
         const res = await fetch('/api/auth/login', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken

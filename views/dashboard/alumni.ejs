@@ -104,24 +104,26 @@
         });
 
         try {
-            const res = await fetch(`/api/analytics/alumni?${params}`, { headers: authHeaders });
-            const data = await res.json();
+            const res = await fetch(`/api/analytics/alumni?${params}`, { headers: authHeaders, credentials: 'include' });
+            const json = await res.json();
+            const data = json.data || json;
 
-            if (!res.ok) throw new Error(data.error || data.message || 'Failed to fetch alumni');
+            if (!res.ok) throw new Error(json.error || json.message || 'Failed to fetch alumni');
 
-            document.getElementById('totalCount').textContent = `Total verified alumni: ${data.total}`;
+            document.getElementById('totalCount').textContent = `Total verified alumni: ${data.total || 0}`;
             
             const tbody = document.getElementById('alumniTableBody');
+            const alumni = data.alumni || (Array.isArray(data) ? data : []);
             
-            if (!data.alumni || data.alumni.length === 0) {
+            if (alumni.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">No alumni found matching your filters.</td></tr>';
                 renderPagination(0);
                 return;
             }
 
-            tbody.innerHTML = data.alumni.map(al => {
-                const degree = al.Profile?.Degrees[0]?.title || 'Unknown Degree';
-                const role = al.Profile?.EmploymentHistories[0]?.job_title || 'No role specified';
+            tbody.innerHTML = alumni.map(al => {
+                const degree = al.Profile?.Degrees?.[0]?.title || 'Unknown Degree';
+                const role = al.Profile?.EmploymentHistories?.[0]?.job_title || 'No role specified';
                 const totalCerts = (al.Profile?.Certifications?.length || 0) + (al.Profile?.Licences?.length || 0) + (al.Profile?.ProfessionalCourses?.length || 0);
                 
                 const emailPrefix = al.email.split('@')[0];
@@ -148,7 +150,7 @@
                 `;
             }).join('');
 
-            renderPagination(data.totalPages);
+            renderPagination(data.totalPages || 0);
         } catch (err) {
             handleFetchError(err);
         } finally {

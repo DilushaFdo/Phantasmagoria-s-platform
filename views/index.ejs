@@ -4,8 +4,12 @@
         <p class="lead mt-3">Discover the career trajectories, certifications, and impact of our most successful university graduates.</p>
         
         <div class="mt-4">
-            <a href="/login" class="btn btn-primary btn-lg px-4 me-2">Login</a>
-            <a href="/register" class="btn btn-outline-primary btn-lg px-4" style="border-color: var(--accent); color: var(--accent);">Join Network</a>
+            <% if (locals.user) { %>
+                <a href="<%= user.role === 'sponsor' ? '/sponsor-dashboard' : '/dashboard' %>" class="btn btn-primary btn-lg px-5">Go to My Dashboard</a>
+            <% } else { %>
+                <a href="/login" class="btn btn-primary btn-lg px-4 me-2">Login</a>
+                <a href="/register" class="btn btn-outline-primary btn-lg px-4" style="border-color: var(--accent); color: var(--accent);">Join Network</a>
+            <% } %>
         </div>
     </div>
     <div class="col-md-6 mt-5 mt-md-0 d-flex justify-content-center">

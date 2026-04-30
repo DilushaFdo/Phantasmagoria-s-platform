@@ -13,12 +13,12 @@ const Session = require("./Session");
 const CsrfToken = require("./CsrfToken");
 const Sponsorship = require("./Sponsorship");
 
-// Relationships between our models
-// Users and their profiles
+// define all the database relations here
+// user has one profile info
 User.hasOne(Profile);
 Profile.belongsTo(User);
 
-// Degrees, certificates, etc. under each profile
+// profile has multiple degrees, certs etc.
 Profile.hasMany(Degree);
 Degree.belongsTo(Profile);
 
@@ -34,19 +34,19 @@ ProfessionalCourse.belongsTo(Profile);
 Profile.hasMany(EmploymentHistory);
 EmploymentHistory.belongsTo(Profile);
 
-// Users can place many bids
+// bids belong to a user
 User.hasMany(Bid);
 Bid.belongsTo(User);
 
-// Developers can have multiple API keys
+// api keys for developers
 User.hasMany(ApiKey);
 ApiKey.belongsTo(User);
 
-// API key usage tracking
+// track when api is used
 ApiKey.hasMany(ApiUsageLog);
 ApiUsageLog.belongsTo(ApiKey);
 
-// Sessions, logins, and CSRF token tracking
+// session and security tracking stuff
 User.hasMany(LoginLog);
 LoginLog.belongsTo(User);
 
@@ -56,7 +56,7 @@ Session.belongsTo(User);
 User.hasMany(CsrfToken);
 CsrfToken.belongsTo(User);
 
-// Sponsorship associations
+// sponsorship relations
 User.hasMany(Sponsorship, { foreignKey: 'SponsorId', as: 'SponsorOfferings' });
 Sponsorship.belongsTo(User, { foreignKey: 'SponsorId', as: 'Sponsor' });
 

@@ -10,10 +10,18 @@ const Sponsorship = sequelize.define("Sponsorship", {
     SponsorId: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: {
-            model: 'Users',
-            key: 'id'
-        }
+    },
+    ProfileId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+    },
+    CertificationId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+    },
+    LicenceId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
     },
     offer_amount: {
         type: DataTypes.DECIMAL(10, 2),
@@ -37,8 +45,9 @@ const Sponsorship = sequelize.define("Sponsorship", {
     updatedAt: false,
     validate: {
         eitherCertOrLicence() {
-            if ((this.CertificationId === null && this.LicenceId === null) || 
-                (this.CertificationId !== null && this.LicenceId !== null)) {
+            const hasCert = this.CertificationId != null;
+            const hasLic = this.LicenceId != null;
+            if ((!hasCert && !hasLic) || (hasCert && hasLic)) {
                 throw new Error('A Sponsorship must reference either a Certification or a Licence, but not both.');
             }
         }

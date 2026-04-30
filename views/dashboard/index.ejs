@@ -187,15 +187,16 @@
     }
 
     async function loadOverview() {
-        const res = await fetch('/api/analytics/overview', { headers: authHeaders });
-        const data = await res.json();
+        const res = await fetch('/api/analytics/overview', { headers: authHeaders, credentials: 'include' });
+        const json = await res.json();
+        const data = json.data || json;
 
-        document.getElementById('statTotalAlumni').textContent = data.totalAlumni;
-        document.getElementById('statActiveBids').textContent = data.totalActiveBids;
+        document.getElementById('statTotalAlumni').textContent = data.totalAlumni || 0;
+        document.getElementById('statActiveBids').textContent = data.totalActiveBids || 0;
         const infProfile = data.todayInfluencer;
         let infName = 'None';
         if (infProfile) {
-            const emailPrefix = infProfile.User.email.split('@')[0];
+            const emailPrefix = infProfile.User?.email.split('@')[0] || 'Unknown';
             infName = (infProfile.first_name || infProfile.last_name) ? `${infProfile.first_name || ''} ${infProfile.last_name || ''}`.trim() : emailPrefix;
         }
         document.getElementById('statInfluencer').textContent = infName;
@@ -207,10 +208,25 @@
     }
 
     async function loadCertChart() {
-        const res = await fetch('/api/analytics/certifications', { headers: authHeaders });
-        const data = await res.json();
+        const res = await fetch('/api/analytics/certifications', { headers: authHeaders, credentials: 'include' });
+        const json = await res.json();
         
-        const top5 = data.mostPopular.slice(0, 5);
+        // Safely extract array regardless of response shape
+        const items = json?.data?.mostPopular 
+            || json?.mostPopular 
+            || json?.data 
+            || (Array.isArray(json) ? json : []);
+
+        if (!Array.isArray(items) || items.length === 0) {
+            // Show empty state
+            const ctx = document.getElementById('certChart').getContext('2d');
+            ctx.font = "14px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("No certification data available", ctx.canvas.width/2, ctx.canvas.height/2);
+            return;
+        }
+
+        const top5 = items.slice(0, 5);
         const ctx = document.getElementById('certChart').getContext('2d');
         
         new Chart(ctx, {
@@ -234,10 +250,20 @@
     }
 
     async function loadRoleChart() {
-        const res = await fetch('/api/analytics/employment', { headers: authHeaders });
-        const data = await res.json();
+        const res = await fetch('/api/analytics/employment', { headers: authHeaders, credentials: 'include' });
+        const json = await res.json();
         
-        const top5 = data.topRoles.slice(0, 5);
+        // Safely extract array
+        const items = json?.data?.topRoles 
+            || json?.topRoles 
+            || json?.data 
+            || (Array.isArray(json) ? json : []);
+
+        if (!Array.isArray(items) || items.length === 0) {
+            return;
+        }
+
+        const top5 = items.slice(0, 5);
         const ctx = document.getElementById('roleChart').getContext('2d');
         
         new Chart(ctx, {
@@ -265,22 +291,24 @@
     }
 
     async function loadRecentAlumni() {
-        const res = await fetch('/api/analytics/alumni?limit=5', { headers: authHeaders });
-        const data = await res.json();
+        const res = await fetch('/api/analytics/alumni?limit=5', { headers: authHeaders, credentials: 'include' });
+        const json = await res.json();
+        const data = json.data || json;
+        const alumni = data.alumni || (Array.isArray(data) ? data : []);
         
         const tbody = document.getElementById('recentAlumniBody');
-        if (data.alumni.length === 0) {
+        if (alumni.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4">No alumni found.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = data.alumni.map(al => {
-            const role = al.Profile.EmploymentHistories[0]?.job_title || 'Not specified';
-            const certs = al.Profile.Certifications.length;
+        tbody.innerHTML = alumni.map(al => {
+            const role = al.Profile?.EmploymentHistories?.[0]?.job_title || 'Not specified';
+            const certs = al.Profile?.Certifications?.length || 0;
             const joined = new Date(al.createdAt).toLocaleDateString();
             
             const emailPrefix = al.email.split('@')[0];
-            const fullName = (al.Profile.first_name || al.Profile.last_name) ? `${al.Profile.first_name || ''} ${al.Profile.last_name || ''}`.trim() : emailPrefix;
+            const fullName = (al.Profile?.first_name || al.Profile?.last_name) ? `${al.Profile.first_name || ''} ${al.Profile.last_name || ''}`.trim() : emailPrefix;
             
             return `
                 <tr>
